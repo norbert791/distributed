@@ -7,15 +7,6 @@
 
 namespace rpc {
 namespace schema {
-enum class Type : std::uint8_t {
-  OPEN,
-  WRITE,
-  LSEEK,
-  CHMOD,
-  UNLINK,
-  RENAME,
-};
-
 using FILE = uint32_t;
 using off_t = std::int64_t;
 using mode_t = std::uint32_t;
@@ -54,9 +45,9 @@ struct RenameRequest final {
   std::string newpath;
 };
 
-using RequestBody = std::variant<OpenRequest, ReadRequest, WriteRequest,
-                                 LSeekRequest, ChmodRequest, UnlinkRequest,
-                                 ChmodRequest, UnlinkRequest, RenameRequest>;
+using RequestBody =
+    std::variant<OpenRequest, ReadRequest, WriteRequest, LSeekRequest,
+                 ChmodRequest, UnlinkRequest, RenameRequest>;
 
 struct OpenResponse final {
   FILE file;
@@ -67,7 +58,7 @@ struct ReadResponse final {
 };
 
 struct WriteResponse final {
-  std::int64_t read;
+  std::int64_t written;
 };
 
 struct LSeekResponse final {
