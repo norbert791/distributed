@@ -20,7 +20,7 @@ meson compile
 
 ## IDE/Editor support
 
-meson generates compile_commands.json in builddir. after running meson compile commands your environment shows include errors, then consider creating symlink in the top-level directory
+meson generates compile_commands.json in builddir. If after running meson compile commands your environment shows include errors, then consider creating symlink in the top-level directory
 
 ```bash
 ln -s builddir/compile_commands.json ./compile_commands.json
