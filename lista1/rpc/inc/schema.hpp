@@ -84,14 +84,16 @@ using ResponseBody =
 enum class Code { OK, TIMEOUT, CONNECTION, INTERNAL, BAD_REQUEST };
 
 struct Header {
-  uint64_t id;
   uint64_t auth;
+  uint64_t id;
 };
 
 struct Request final {
   Header header;
   RequestBody body;
 };
+
+// TODO: Replace header with id?
 
 struct Response final {
   Header header;

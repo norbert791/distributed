@@ -25,15 +25,6 @@ public:
   virtual void setHandler(handler) = 0;
 };
 
-using File = schema::FILE;
-
-class Filesystem {
-public:
-  Filesystem(std::unique_ptr<Client> client);
-
-  File open(std::string filename, std::string mode);
-};
-
 } // namespace protocol
 
 } // namespace rpc

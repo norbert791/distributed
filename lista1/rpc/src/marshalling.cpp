@@ -1,14 +1,12 @@
-#include "schema.hpp"
 #include <algorithm>
 #include <array>
-#include <cstddef>
 #include <cstdint>
-
-#include <iterator>
-#include <marshaling.hpp>
 #include <stdexcept>
 #include <variant>
 #include <vector>
+
+#include <marshalling.hpp>
+#include <schema.hpp>
 
 namespace rpc {
 namespace marshaling {
@@ -63,13 +61,12 @@ void writeString(std::vector<std::uint8_t>::iterator& it, std::string str) {
 template <typename T>
 void readBytes(std::vector<std::uint8_t>::iterator& it, T& obj) {
   std::array<std::uint8_t, sizeof(obj)> arr;
-  std::copy(it, it + sizeof(obj), arr);
+  std::copy(it, it + sizeof(obj), arr.data());
   it = it + sizeof(obj);
 
   fromBytes(arr, obj);
 }
 
-template <typename T>
 void readString(std::vector<std::uint8_t>::iterator& it, std::string& result) {
   std::uint64_t len;
   readBytes(it, len);
@@ -164,42 +161,134 @@ schema::Request unmarshalRequest(std::vector<std::uint8_t> bytes) {
   using namespace schema;
   Request result;
 
-  auto header = req.header;
-  auto resultIt = result.begin();
+  auto it = bytes.begin();
 
-  writeBytes(resultIt, header.auth);
-  writeBytes(resultIt, header.id);
+  readBytes(it, result.header.auth);
+  readBytes(it, result.header.id);
 
-  if (auto body = std::get_if<OpenRequest>(&req.body)) {
-    writeBytes(resultIt, Type::OPEN);
-    writeString(resultIt, body->pathname);
-    writeString(resultIt, body->mode);
-  } else if (auto body = std::get_if<ReadRequest>(&req.body)) {
-    writeBytes(resultIt, Type::READ);
-    writeBytes(resultIt, body->desc);
-    writeBytes(resultIt, body->count);
-  } else if (auto body = std::get_if<WriteRequest>(&req.body)) {
-    writeBytes(resultIt, Type::WRITE);
-    writeBytes(resultIt, body->desc);
-    writeBytes(resultIt, body->count);
-  } else if (auto body = std::get_if<LSeekRequest>(&req.body)) {
-    writeBytes(resultIt, Type::LSEEK);
-    writeBytes(resultIt, body->desc);
-    writeBytes(resultIt, body->offset);
-  } else if (auto body = std::get_if<ChmodRequest>(&req.body)) {
-    writeBytes(resultIt, Type::CHMOD);
-    writeString(resultIt, body->pathname);
-    writeBytes(resultIt, body->mode);
-  } else if (auto body = std::get_if<UnlinkRequest>(&req.body)) {
-    writeBytes(resultIt, Type::UNLINK);
-    writeString(resultIt, body->pathname);
-  } else if (auto body = std::get_if<RenameRequest>(&req.body)) {
-    writeBytes(resultIt, Type::RENAME);
-    writeString(resultIt, body->oldpath);
-    writeString(resultIt, body->newpath);
-  } else {
-    throw std::invalid_argument("Unknown type");
+  Type type;
+  readBytes(it, type);
+  schema::RequestBody body;
+
+  switch (type) {
+  case Type::OPEN: {
+    schema::OpenRequest req{};
+    readString(it, req.pathname);
+    readString(it, req.mode);
+    body = req;
+    break;
   }
+  case Type::READ: {
+    schema::ReadRequest req{};
+    readBytes(it, req.desc);
+    readBytes(it, req.count);
+    body = req;
+    break;
+  }
+  case Type::WRITE: {
+    schema::WriteRequest req{};
+    readBytes(it, req.desc);
+    readBytes(it, req.count);
+    body = req;
+    break;
+  }
+  case Type::LSEEK: {
+    schema::LSeekRequest req{};
+    readBytes(it, req.desc);
+    readBytes(it, req.offset);
+    body = req;
+    break;
+  }
+  case Type::CHMOD: {
+    schema::ChmodRequest req{};
+    readBytes(it, req.pathname);
+    readBytes(it, req.mode);
+    body = req;
+    break;
+  }
+  case Type::UNLINK: {
+    schema::UnlinkRequest req{};
+    readBytes(it, req.pathname);
+    body = req;
+    break;
+  }
+  case Type::RENAME: {
+    schema::RenameRequest req{};
+    readString(it, req.oldpath);
+    readString(it, req.newpath);
+    body = req;
+    break;
+  }
+  default:
+    throw std::invalid_argument("Invalid message type");
+  }
+
+  result.body = body;
+
+  return result;
+}
+
+schema::Response unmarshalResponse(std::vector<std::uint8_t> bytes) {
+  using namespace schema;
+  Response result;
+
+  auto it = bytes.begin();
+
+  readBytes(it, result.header.auth);
+  readBytes(it, result.header.id);
+
+  Type type;
+  readBytes(it, type);
+  schema::ResponseBody body;
+
+  switch (type) {
+  case Type::OPEN: {
+    schema::OpenResponse res{};
+    readBytes(it, res.file);
+    body = res;
+    break;
+  }
+  case Type::READ: {
+    schema::ReadResponse res{};
+    readBytes(it, res.read);
+    body = res;
+    break;
+  }
+  case Type::WRITE: {
+    schema::WriteResponse res{};
+    readBytes(it, res.written);
+    body = res;
+    break;
+  }
+  case Type::LSEEK: {
+    schema::LSeekResponse res{};
+    readBytes(it, res.offset);
+    body = res;
+    break;
+  }
+  case Type::CHMOD: {
+    schema::ChmodResponse res{};
+    readBytes(it, res.result);
+    body = res;
+    break;
+  }
+  case Type::UNLINK: {
+    schema::UnlinkResponse res{};
+    readBytes(it, res.result);
+    body = res;
+    break;
+  }
+  case Type::RENAME: {
+    schema::RenameResponse res{};
+    readBytes(it, res.result);
+    body = res;
+    break;
+  }
+  default:
+    throw std::invalid_argument("Invalid message type");
+  }
+
+  result.body = body;
 
   return result;
 }
