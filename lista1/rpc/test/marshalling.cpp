@@ -16,8 +16,8 @@ TEST(rpc_marshalling, request) {
         .header = {.auth = 12, .id = 15},
         .body = body,
     };
-    auto bytes = marshaling::marshalRequest(req);
-    auto unmarshaled = marshaling::unmarshalRequest(bytes);
+    auto bytes = marshalling::marshalRequest(req);
+    auto unmarshaled = marshalling::unmarshalRequest(bytes);
 
     EXPECT_EQ(req.header.id, unmarshaled.header.id);
     EXPECT_EQ(req.header.auth, unmarshaled.header.auth);
@@ -37,8 +37,8 @@ TEST(rpc_marshalling, request) {
         .header = {.auth = 4, .id = 60},
         .body = body,
     };
-    auto bytes = marshaling::marshalRequest(req);
-    auto unmarshaled = marshaling::unmarshalRequest(bytes);
+    auto bytes = marshalling::marshalRequest(req);
+    auto unmarshaled = marshalling::unmarshalRequest(bytes);
 
     EXPECT_EQ(req.header.id, unmarshaled.header.id);
     EXPECT_EQ(req.header.auth, unmarshaled.header.auth);

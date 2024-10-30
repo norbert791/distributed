@@ -6,12 +6,12 @@
 #include <vector>
 
 namespace filesystem {
-rpc::server::File Filesystem::open(std::string pathname,
-                                   rpc::server::mode_t mode) {
+rpc::schema::File Filesystem::open(std::string pathname,
+                                   rpc::schema::mode_t mode) {
   std::filesystem::path path{pathname};
   std::filesystem::path root{this->root};
   root += path;
-  rpc::server::File desc = this->descCounter;
+  rpc::schema::File desc = this->descCounter;
   descCounter++;
 
   std::fstream stream{};
@@ -26,9 +26,8 @@ rpc::server::File Filesystem::open(std::string pathname,
   return desc;
 }
 
-std::int64_t Filesystem::read(rpc::server::File desc,
-                              std::vector<std::uint8_t>& v,
-                              std::uint64_t count) {
+std::int64_t Filesystem::read(rpc::schema::File desc, std::uint64_t count,
+                              std::vector<std::uint8_t>& v) {
   if (!this->files.contains(desc)) {
     return -1;
   }
@@ -41,9 +40,8 @@ std::int64_t Filesystem::read(rpc::server::File desc,
   return count;
 }
 
-std::int64_t Filesystem::write(rpc::server::File desc,
-                               std::vector<std::uint8_t>& v,
-                               std::uint64_t count) {
+std::int64_t Filesystem::write(rpc::schema::File desc, std::uint64_t count,
+                               std::vector<std::uint8_t>& v) {
   if (!this->files.contains(desc)) {
     return -1;
   }
@@ -56,8 +54,8 @@ std::int64_t Filesystem::write(rpc::server::File desc,
   return count;
 }
 
-rpc::server::off_t Filesystem::lseek(rpc::server::File desc,
-                                     rpc::server::off_t offset) {
+rpc::schema::off_t Filesystem::lseek(rpc::schema::File desc,
+                                     rpc::schema::off_t offset) {
   if (!this->files.contains(desc)) {
     return -1;
   }

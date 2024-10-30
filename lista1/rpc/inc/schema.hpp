@@ -4,10 +4,11 @@
 #include <cstdint>
 #include <string>
 #include <variant>
+#include <vector>
 
 namespace rpc {
 namespace schema {
-using FILE = uint32_t;
+using File = uint32_t;
 using off_t = std::int64_t;
 using mode_t = std::uint32_t;
 
@@ -17,17 +18,18 @@ struct OpenRequest final {
 };
 
 struct ReadRequest final {
-  FILE desc;
+  File desc;
   std::uint64_t count;
 };
 
 struct WriteRequest final {
-  FILE desc;
+  File desc;
   std::uint64_t count;
+  std::vector<std::uint8_t> bytes;
 };
 
 struct LSeekRequest final {
-  FILE desc;
+  File desc;
   off_t offset;
 };
 
@@ -50,12 +52,12 @@ using RequestBody =
                  ChmodRequest, UnlinkRequest, RenameRequest>;
 
 struct OpenResponse final {
-  FILE file;
+  File file;
 };
 
 struct ReadResponse final {
   std::int64_t read;
-  std::string data;
+  std::vector<std::uint8_t> bytes;
 };
 
 struct WriteResponse final {

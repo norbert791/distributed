@@ -45,21 +45,22 @@ constexpr void fromBytes(std::array<std::uint8_t, sizeof(T)> arr, T& result) {
 } // namespace
 
 template <typename T>
-void writeBytes(std::vector<std::uint8_t>::iterator& it, T obj) {
+void writeScalar(std::vector<std::uint8_t>::iterator& it, const T obj) {
   auto arr = toBytes(obj);
   it = std::copy(arr.begin(), arr.end(), it);
 }
 
-void writeString(std::vector<std::uint8_t>::iterator& it, std::string str) {
+void writeString(std::vector<std::uint8_t>::iterator& it,
+                 const std::string str) {
   std::uint64_t len = str.size();
   auto data = str.data();
 
-  writeBytes(it, len);
+  writeScalar(it, len);
   it = std::copy(data, data + len, it);
 }
 
 template <typename T>
-void readBytes(std::vector<std::uint8_t>::iterator& it, T& obj) {
+void readScalar(std::vector<std::uint8_t>::iterator& it, T& obj) {
   std::array<std::uint8_t, sizeof(obj)> arr;
   std::copy(it, it + sizeof(obj), arr.data());
   it = it + sizeof(obj);
@@ -69,7 +70,7 @@ void readBytes(std::vector<std::uint8_t>::iterator& it, T& obj) {
 
 void readString(std::vector<std::uint8_t>::iterator& it, std::string& result) {
   std::uint64_t len;
-  readBytes(it, len);
+  readScalar(it, len);
 
   std::vector<char> vec(len, 0);
   std::copy(it, it + len, vec.begin());
@@ -84,34 +85,36 @@ std::vector<std::uint8_t> marshalRequest(schema::Request req) {
   auto header = req.header;
   auto resultIt = result.begin();
 
-  writeBytes(resultIt, header.auth);
-  writeBytes(resultIt, header.id);
+  writeScalar(resultIt, header.auth);
+  writeScalar(resultIt, header.id);
 
   if (auto body = std::get_if<OpenRequest>(&req.body)) {
-    writeBytes(resultIt, Type::OPEN);
+    writeScalar(resultIt, Type::OPEN);
     writeString(resultIt, body->pathname);
-    writeBytes(resultIt, body->mode);
+    writeScalar(resultIt, body->mode);
   } else if (auto body = std::get_if<ReadRequest>(&req.body)) {
-    writeBytes(resultIt, Type::READ);
-    writeBytes(resultIt, body->desc);
-    writeBytes(resultIt, body->count);
+    writeScalar(resultIt, Type::READ);
+    writeScalar(resultIt, body->desc);
+    writeScalar(resultIt, body->count);
   } else if (auto body = std::get_if<WriteRequest>(&req.body)) {
-    writeBytes(resultIt, Type::WRITE);
-    writeBytes(resultIt, body->desc);
-    writeBytes(resultIt, body->count);
+    writeScalar(resultIt, Type::WRITE);
+    writeScalar(resultIt, body->desc);
+    writeScalar(resultIt, body->count);
+    resultIt = std::copy(body->bytes.begin(), body->bytes.begin() + body->count,
+                         resultIt);
   } else if (auto body = std::get_if<LSeekRequest>(&req.body)) {
-    writeBytes(resultIt, Type::LSEEK);
-    writeBytes(resultIt, body->desc);
-    writeBytes(resultIt, body->offset);
+    writeScalar(resultIt, Type::LSEEK);
+    writeScalar(resultIt, body->desc);
+    writeScalar(resultIt, body->offset);
   } else if (auto body = std::get_if<ChmodRequest>(&req.body)) {
-    writeBytes(resultIt, Type::CHMOD);
+    writeScalar(resultIt, Type::CHMOD);
     writeString(resultIt, body->pathname);
-    writeBytes(resultIt, body->mode);
+    writeScalar(resultIt, body->mode);
   } else if (auto body = std::get_if<UnlinkRequest>(&req.body)) {
-    writeBytes(resultIt, Type::UNLINK);
+    writeScalar(resultIt, Type::UNLINK);
     writeString(resultIt, body->pathname);
   } else if (auto body = std::get_if<RenameRequest>(&req.body)) {
-    writeBytes(resultIt, Type::RENAME);
+    writeScalar(resultIt, Type::RENAME);
     writeString(resultIt, body->oldpath);
     writeString(resultIt, body->newpath);
   } else {
@@ -128,31 +131,32 @@ std::vector<std::uint8_t> marshalResponse(schema::Response resp) {
   auto header = resp.header;
   auto resultIt = result.begin();
 
-  writeBytes(resultIt, header.auth);
-  writeBytes(resultIt, header.id);
+  writeScalar(resultIt, header.auth);
+  writeScalar(resultIt, header.id);
 
   if (auto body = std::get_if<OpenResponse>(&resp.body)) {
-    writeBytes(resultIt, Type::OPEN);
-    writeBytes(resultIt, body->file);
+    writeScalar(resultIt, Type::OPEN);
+    writeScalar(resultIt, body->file);
   } else if (auto body = std::get_if<ReadResponse>(&resp.body)) {
-    writeBytes(resultIt, Type::READ);
-    writeBytes(resultIt, body->read);
-    writeString(resultIt, body->data);
+    writeScalar(resultIt, Type::READ);
+    writeScalar(resultIt, body->read);
+    resultIt = std::copy(body->bytes.begin(), body->bytes.begin() + body->read,
+                         resultIt);
   } else if (auto body = std::get_if<WriteResponse>(&resp.body)) {
-    writeBytes(resultIt, Type::WRITE);
-    writeBytes(resultIt, body->written);
+    writeScalar(resultIt, Type::WRITE);
+    writeScalar(resultIt, body->written);
   } else if (auto body = std::get_if<LSeekResponse>(&resp.body)) {
-    writeBytes(resultIt, Type::LSEEK);
-    writeBytes(resultIt, body->offset);
+    writeScalar(resultIt, Type::LSEEK);
+    writeScalar(resultIt, body->offset);
   } else if (auto body = std::get_if<ChmodResponse>(&resp.body)) {
-    writeBytes(resultIt, Type::CHMOD);
-    writeBytes(resultIt, body->result);
+    writeScalar(resultIt, Type::CHMOD);
+    writeScalar(resultIt, body->result);
   } else if (auto body = std::get_if<UnlinkResponse>(&resp.body)) {
-    writeBytes(resultIt, Type::UNLINK);
-    writeBytes(resultIt, body->result);
+    writeScalar(resultIt, Type::UNLINK);
+    writeScalar(resultIt, body->result);
   } else if (auto body = std::get_if<RenameResponse>(&resp.body)) {
-    writeBytes(resultIt, Type::RENAME);
-    writeBytes(resultIt, body->result);
+    writeScalar(resultIt, Type::RENAME);
+    writeScalar(resultIt, body->result);
   }
 
   return result;
@@ -164,52 +168,55 @@ schema::Request unmarshalRequest(std::vector<std::uint8_t> bytes) {
 
   auto it = bytes.begin();
 
-  readBytes(it, result.header.auth);
-  readBytes(it, result.header.id);
+  readScalar(it, result.header.auth);
+  readScalar(it, result.header.id);
 
   Type type;
-  readBytes(it, type);
+  readScalar(it, type);
   schema::RequestBody body;
 
   switch (type) {
   case Type::OPEN: {
     schema::OpenRequest req{};
     readString(it, req.pathname);
-    readBytes(it, req.mode);
+    readScalar(it, req.mode);
     body = req;
     break;
   }
   case Type::READ: {
     schema::ReadRequest req{};
-    readBytes(it, req.desc);
-    readBytes(it, req.count);
+    readScalar(it, req.desc);
+    readScalar(it, req.count);
     body = req;
     break;
   }
   case Type::WRITE: {
     schema::WriteRequest req{};
-    readBytes(it, req.desc);
-    readBytes(it, req.count);
+    readScalar(it, req.desc);
+    readScalar(it, req.count);
+    req.bytes = std::vector<std::uint8_t>(req.count, 0);
+    std::copy(it, it + req.count, req.bytes.begin());
+    it += req.count;
     body = req;
     break;
   }
   case Type::LSEEK: {
     schema::LSeekRequest req{};
-    readBytes(it, req.desc);
-    readBytes(it, req.offset);
+    readScalar(it, req.desc);
+    readScalar(it, req.offset);
     body = req;
     break;
   }
   case Type::CHMOD: {
     schema::ChmodRequest req{};
-    readBytes(it, req.pathname);
-    readBytes(it, req.mode);
+    readScalar(it, req.pathname);
+    readScalar(it, req.mode);
     body = req;
     break;
   }
   case Type::UNLINK: {
     schema::UnlinkRequest req{};
-    readBytes(it, req.pathname);
+    readScalar(it, req.pathname);
     body = req;
     break;
   }
@@ -235,54 +242,56 @@ schema::Response unmarshalResponse(std::vector<std::uint8_t> bytes) {
 
   auto it = bytes.begin();
 
-  readBytes(it, result.header.auth);
-  readBytes(it, result.header.id);
+  readScalar(it, result.header.auth);
+  readScalar(it, result.header.id);
 
   Type type;
-  readBytes(it, type);
+  readScalar(it, type);
   schema::ResponseBody body;
 
   switch (type) {
   case Type::OPEN: {
     schema::OpenResponse res{};
-    readBytes(it, res.file);
+    readScalar(it, res.file);
     body = res;
     break;
   }
   case Type::READ: {
     schema::ReadResponse res{};
-    readBytes(it, res.read);
-    readString(it, res.data);
+    readScalar(it, res.read);
+    res.bytes = std::vector<std::uint8_t>(res.read, 0);
+    std::copy(it, it + res.read, res.bytes.begin());
+    it += res.read;
     body = res;
     break;
   }
   case Type::WRITE: {
     schema::WriteResponse res{};
-    readBytes(it, res.written);
+    readScalar(it, res.written);
     body = res;
     break;
   }
   case Type::LSEEK: {
     schema::LSeekResponse res{};
-    readBytes(it, res.offset);
+    readScalar(it, res.offset);
     body = res;
     break;
   }
   case Type::CHMOD: {
     schema::ChmodResponse res{};
-    readBytes(it, res.result);
+    readScalar(it, res.result);
     body = res;
     break;
   }
   case Type::UNLINK: {
     schema::UnlinkResponse res{};
-    readBytes(it, res.result);
+    readScalar(it, res.result);
     body = res;
     break;
   }
   case Type::RENAME: {
     schema::RenameResponse res{};
-    readBytes(it, res.result);
+    readScalar(it, res.result);
     body = res;
     break;
   }

@@ -10,7 +10,7 @@
 namespace rpc {
 namespace udp {
 
-using File = schema::FILE;
+using File = schema::File;
 
 class Client : public protocol::Client {
 public:

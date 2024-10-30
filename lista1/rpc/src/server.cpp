@@ -17,12 +17,11 @@ rpc::protocol::handler Server::makeHandler() {
       response.body = res;
     } else if (auto it = std::get_if<ReadRequest>(&request.body)) {
       ReadResponse res;
-      res.read = this->ReadHandler(it->desc, it->count);
-      res.data = "TODO: implement read";
+      res.read = this->ReadHandler(it->desc, it->count, res.bytes);
       response.body = res;
     } else if (auto it = std::get_if<WriteRequest>(&request.body)) {
       WriteResponse res;
-      res.written = this->WriteHandler(it->desc, it->count);
+      res.written = this->WriteHandler(it->desc, it->count, it->bytes);
       response.body = res;
     } else if (auto it = std::get_if<LSeekRequest>(&request.body)) {
       LSeekResponse res;

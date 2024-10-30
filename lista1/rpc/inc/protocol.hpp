@@ -3,10 +3,7 @@
 
 #include <cstdint>
 #include <functional>
-#include <memory>
 #include <vector>
-
-#include "schema.hpp"
 
 namespace rpc {
 namespace protocol {
