@@ -13,7 +13,7 @@ using mode_t = std::uint32_t;
 
 struct OpenRequest final {
   std::string pathname;
-  std::string mode;
+  mode_t mode;
 };
 
 struct ReadRequest final {

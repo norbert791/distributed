@@ -2,9 +2,7 @@
 #define RPC_SERVER_HPP
 
 #include <functional>
-#include <memory>
 
-#include "protocol.hpp">
 #include "schema.hpp"
 
 namespace rpc {
@@ -12,6 +10,7 @@ namespace server {
 
 using File = schema::FILE;
 using off_t = schema::off_t;
+using mode_t = schema::mode_t;
 
 using openHandler =
     std::function<std::uint32_t(std::string path, std::string mode)>;
@@ -29,8 +28,6 @@ struct ServerConfig {
   std::function<std::int64_t(std::string oldpath, std::string newpath)>
       RenameHandler;
 };
-
-void
 
 } // namespace server
 } // namespace rpc

@@ -90,7 +90,7 @@ std::vector<std::uint8_t> marshalRequest(schema::Request req) {
   if (auto body = std::get_if<OpenRequest>(&req.body)) {
     writeBytes(resultIt, Type::OPEN);
     writeString(resultIt, body->pathname);
-    writeString(resultIt, body->mode);
+    writeBytes(resultIt, body->mode);
   } else if (auto body = std::get_if<ReadRequest>(&req.body)) {
     writeBytes(resultIt, Type::READ);
     writeBytes(resultIt, body->desc);
@@ -174,7 +174,7 @@ schema::Request unmarshalRequest(std::vector<std::uint8_t> bytes) {
   case Type::OPEN: {
     schema::OpenRequest req{};
     readString(it, req.pathname);
-    readString(it, req.mode);
+    readBytes(it, req.mode);
     body = req;
     break;
   }
