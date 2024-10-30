@@ -55,6 +55,7 @@ struct OpenResponse final {
 
 struct ReadResponse final {
   std::int64_t read;
+  std::string data;
 };
 
 struct WriteResponse final {

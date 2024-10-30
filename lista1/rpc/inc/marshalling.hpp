@@ -6,12 +6,12 @@
 #include "schema.hpp"
 
 namespace rpc {
-namespace marshaling {
+namespace marshalling {
 std::vector<std::uint8_t> marshalRequest(schema::Request);
 schema::Request unmarshalRequest(std::vector<std::uint8_t>);
 std::vector<std::uint8_t> marshalResponse(schema::Response);
 schema::Response unmarshalResponse(std::vector<std::uint8_t>);
-} // namespace marshaling
+} // namespace marshalling
 } // namespace rpc
 
 #endif // RPC_MARSHALLING_HPP

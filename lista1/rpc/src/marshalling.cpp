@@ -9,7 +9,7 @@
 #include <schema.hpp>
 
 namespace rpc {
-namespace marshaling {
+namespace marshalling {
 namespace {
 enum class Type : std::uint8_t {
   OPEN,
@@ -137,6 +137,7 @@ std::vector<std::uint8_t> marshalResponse(schema::Response resp) {
   } else if (auto body = std::get_if<ReadResponse>(&resp.body)) {
     writeBytes(resultIt, Type::READ);
     writeBytes(resultIt, body->read);
+    writeString(resultIt, body->data);
   } else if (auto body = std::get_if<WriteResponse>(&resp.body)) {
     writeBytes(resultIt, Type::WRITE);
     writeBytes(resultIt, body->written);
@@ -251,6 +252,7 @@ schema::Response unmarshalResponse(std::vector<std::uint8_t> bytes) {
   case Type::READ: {
     schema::ReadResponse res{};
     readBytes(it, res.read);
+    readString(it, res.data);
     body = res;
     break;
   }
@@ -293,6 +295,6 @@ schema::Response unmarshalResponse(std::vector<std::uint8_t> bytes) {
   return result;
 }
 
-} // namespace marshaling
+} // namespace marshalling
 
 } // namespace rpc
