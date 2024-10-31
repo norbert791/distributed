@@ -1,5 +1,5 @@
 rpc_inc = include_directories('inc')
-rpc_src = files('src/marshalling.cpp', 'src/server.cpp', 'src/udp.cpp')
+rpc_src = files('src/marshalling.cpp', 'src/server.cpp', 'src/udp.cpp', 'src/client.cpp')
 
 asio_dep = dependency('asio', required: true)
 rpc_dep = static_library(

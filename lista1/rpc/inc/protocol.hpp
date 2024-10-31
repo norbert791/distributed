@@ -12,6 +12,7 @@ class Client {
 public:
   virtual std::vector<std::uint8_t>
   makeRequest(const std::vector<std::uint8_t>&) = 0;
+  virtual ~Client() = default;
 };
 
 using handler =
@@ -20,6 +21,7 @@ using handler =
 class Server {
 public:
   virtual void setHandler(handler) = 0;
+  virtual ~Server() = default;
 };
 
 } // namespace protocol

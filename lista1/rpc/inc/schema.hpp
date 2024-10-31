@@ -31,6 +31,7 @@ struct WriteRequest final {
 struct LSeekRequest final {
   File desc;
   off_t offset;
+  std::uint32_t whence;
 };
 
 struct ChmodRequest final {
@@ -84,7 +85,14 @@ using ResponseBody =
     std::variant<OpenResponse, ReadResponse, WriteResponse, LSeekResponse,
                  ChmodResponse, UnlinkResponse, RenameResponse>;
 
-enum class Code { OK, TIMEOUT, CONNECTION, INTERNAL, BAD_REQUEST };
+enum class Code : uint8_t {
+  OK,
+  TIMEOUT,
+  CONNECTION,
+  INTERNAL,
+  BAD_REQUEST,
+  FORBIDDEN,
+};
 
 struct Header {
   uint64_t auth;
@@ -99,7 +107,8 @@ struct Request final {
 // TODO: Replace header with id?
 
 struct Response final {
-  Header header;
+  uint64_t id;
+  Code code;
   ResponseBody body;
 };
 

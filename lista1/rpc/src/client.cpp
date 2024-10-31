@@ -1,16 +1,21 @@
 #include "marshalling.hpp"
 #include "schema.hpp"
 #include <client.hpp>
+#include <stdexcept>
 
 namespace rpc {
 namespace client {
 schema::ResponseBody Client::sendBody(schema::RequestBody body) {
   using namespace schema;
-  // TODO: set request id
-  Request req{.header = Header{.auth = this->auth, .id = 1}, .body = body};
+  Request req{.header =
+                  Header{.auth = this->auth, .id = this->uniform(this->rng)},
+              .body = body};
   auto bytes = this->client->makeRequest(marshalling::marshalRequest(req));
-  // TODO: handle id
   auto resp = marshalling::unmarshalResponse(bytes);
+  if (resp.id != req.header.id) {
+    // TODO: improve handling
+    throw std::invalid_argument("bad return code");
+  }
 
   return resp.body;
 }
@@ -39,8 +44,9 @@ std::int64_t Client::write(schema::File desc, std::uint64_t count,
   return result.written;
 }
 
-schema::off_t Client::lseek(schema::File desc, schema::off_t offset) {
-  schema::LSeekRequest req{.desc = desc, .offset = offset};
+schema::off_t Client::lseek(schema::File desc, schema::off_t offset,
+                            std::uint32_t whence) {
+  schema::LSeekRequest req{.desc = desc, .offset = offset, .whence = whence};
   schema::ResponseBody resp = this->sendBody(req);
   auto result = std::get<schema::LSeekResponse>(resp);
   return result.offset;

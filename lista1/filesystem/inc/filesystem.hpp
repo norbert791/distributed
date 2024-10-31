@@ -20,10 +20,13 @@ public:
                     std::vector<std::uint8_t>& v);
   std::int64_t write(rpc::schema::File desc, std::uint64_t count,
                      std::vector<std::uint8_t>& v);
-  rpc::schema::off_t lseek(rpc::schema::File desc, rpc::schema::off_t offset);
+  rpc::schema::off_t lseek(rpc::schema::File desc, rpc::schema::off_t offset,
+                           std::uint32_t whence);
   std::int64_t chmod(std::string pathname, std::uint32_t mode);
   std::int64_t unlink(std::string pathname);
   std::int64_t rename(std::string oldpath, std::string newpath);
+
+  rpc::server::Handlers generateHandlers();
 
 private:
   const std::filesystem::path root;

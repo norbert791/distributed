@@ -1,6 +1,8 @@
 #include "server.hpp"
 #include <filesystem.hpp>
+
 #include <filesystem>
+#include <functional>
 #include <ios>
 #include <iostream>
 #include <vector>
@@ -55,7 +57,8 @@ std::int64_t Filesystem::write(rpc::schema::File desc, std::uint64_t count,
 }
 
 rpc::schema::off_t Filesystem::lseek(rpc::schema::File desc,
-                                     rpc::schema::off_t offset) {
+                                     rpc::schema::off_t offset,
+                                     std::uint32_t whence) {
   if (!this->files.contains(desc)) {
     return -1;
   }
@@ -63,8 +66,8 @@ rpc::schema::off_t Filesystem::lseek(rpc::schema::File desc,
   // TODO: add exception handling
 
   std::fstream& file = this->files[desc];
-  file.seekg(offset);
-  file.seekp(offset);
+  file.seekg(offset, static_cast<std::ios::seekdir>(whence));
+  file.seekp(offset, static_cast<std::ios::seekdir>(whence));
 
   return offset;
 }
@@ -95,6 +98,19 @@ std::int64_t Filesystem::rename(std::string oldpath, std::string newpath) {
   // TODO: add exception handling
 
   return 0;
+}
+
+rpc::server::Handlers Filesystem::generateHandlers() {
+  using namespace std::placeholders;
+  return rpc::server::Handlers{
+      .OpenHandler = std::bind(&Filesystem::open, this, _1, _2),
+      .ReadHandler = std::bind(&Filesystem::read, this, _1, _2, _3),
+      .WriteHandler = std::bind(&Filesystem::write, this, _1, _2, _3),
+      .LSeekHandler = std::bind(&Filesystem::lseek, this, _1, _2, _3),
+      .ChmodHandler = std::bind(&Filesystem::chmod, this, _1, _2),
+      .UnlinkHandler = std::bind(&Filesystem::unlink, this, _1),
+      .RenameHandler = std::bind(&Filesystem::rename, this, _1, _2),
+  };
 }
 
 } // namespace filesystem

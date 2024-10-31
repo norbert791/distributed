@@ -3,7 +3,9 @@
 
 #include <functional>
 #include <memory>
+#include <unordered_map>
 
+#include "asio/io_context.hpp"
 #include "protocol.hpp"
 #include "schema.hpp"
 
@@ -23,7 +25,8 @@ struct Handlers {
   std::function<std::int64_t(schema::File desc, std::uint64_t count,
                              std::vector<std::uint8_t>&)>
       WriteHandler;
-  std::function<off_t(schema::File desc, off_t offset)> LSeekHandler;
+  std::function<off_t(schema::File desc, off_t offset, std::uint32_t whence)>
+      LSeekHandler;
   std::function<std::int64_t(std::string pathname, std::uint32_t mode)>
       ChmodHandler;
   std::function<std::int64_t(std::string pathname)> UnlinkHandler;
@@ -31,16 +34,21 @@ struct Handlers {
       RenameHandler;
 };
 
+using Permissions = std::array<bool, 7>;
+
 class Server : public Handlers {
 public:
-  Server(Handlers config, std::shared_ptr<rpc::protocol::Server> server)
-      : Handlers(config), server{server} {
+  Server(Handlers handlers, std::shared_ptr<rpc::protocol::Server> server,
+         std::unordered_map<std::uint64_t, Permissions> users)
+      : Handlers(handlers), server{server}, perms{users} {
     this->server->setHandler(this->makeHandler());
   }
 
 private:
   std::shared_ptr<rpc::protocol::Server> server;
+  std::unordered_map<std::uint64_t, Permissions> perms;
   rpc::protocol::handler makeHandler();
+  asio::io_context ctx;
 };
 
 } // namespace server

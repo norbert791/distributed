@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <iostream>
 #include <stdexcept>
 #include <variant>
 #include <vector>
@@ -106,6 +107,7 @@ std::vector<std::uint8_t> marshalRequest(schema::Request req) {
     writeScalar(resultIt, Type::LSEEK);
     writeScalar(resultIt, body->desc);
     writeScalar(resultIt, body->offset);
+    writeScalar(resultIt, body->whence);
   } else if (auto body = std::get_if<ChmodRequest>(&req.body)) {
     writeScalar(resultIt, Type::CHMOD);
     writeString(resultIt, body->pathname);
@@ -128,11 +130,10 @@ std::vector<std::uint8_t> marshalResponse(schema::Response resp) {
   using namespace schema;
   std::vector<std::uint8_t> result(sizeof(resp) + sizeof(Type), 0);
 
-  auto header = resp.header;
   auto resultIt = result.begin();
 
-  writeScalar(resultIt, header.auth);
-  writeScalar(resultIt, header.id);
+  writeScalar(resultIt, resp.id);
+  writeScalar(resultIt, resp.code);
 
   if (auto body = std::get_if<OpenResponse>(&resp.body)) {
     writeScalar(resultIt, Type::OPEN);
@@ -204,6 +205,7 @@ schema::Request unmarshalRequest(std::vector<std::uint8_t> bytes) {
     schema::LSeekRequest req{};
     readScalar(it, req.desc);
     readScalar(it, req.offset);
+    readScalar(it, req.whence);
     body = req;
     break;
   }
@@ -242,8 +244,8 @@ schema::Response unmarshalResponse(std::vector<std::uint8_t> bytes) {
 
   auto it = bytes.begin();
 
-  readScalar(it, result.header.auth);
-  readScalar(it, result.header.id);
+  readScalar(it, result.id);
+  readScalar(it, result.code);
 
   Type type;
   readScalar(it, type);

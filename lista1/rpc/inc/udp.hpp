@@ -26,6 +26,7 @@ private:
 class Server : public protocol::Server {
 public:
   void run();
+  void stop();
 
   virtual void setHandler(
       std::function<std::vector<std::uint8_t>(std::vector<std::uint8_t>)>)
@@ -33,6 +34,8 @@ public:
 
 private:
   protocol::handler handler;
+  bool running{};
+  asio::io_context ctx;
 };
 
 } // namespace udp
