@@ -8,6 +8,3 @@ project(
 subdir('rpc')
 subdir('filesystem')
 subdir('demo')
-client = executable('client', 'client.cpp', dependencies: [rpc_dep])
-server = executable('server', 'server.cpp', dependencies: [rpc_dep])
-
