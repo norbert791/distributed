@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package chat;
+
+message Empty {}
+
+message Note {
+    string name = 1;
+    string text = 2;
+}
+
+service ChatServer {
+    rpc ChatStream (Empty) returns (stream Note);
+    rpc SendNote (Note) returns (Empty);
+}
