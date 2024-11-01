@@ -12,7 +12,7 @@
 
 int main() {
   // Init
-  filesystem::Filesystem fsystem{"/tmp/files"};
+  filesystem::Filesystem fsystem{"/tmp"};
   rpc::server::Handlers handlers{fsystem.generateHandlers()};
   std::uint64_t token = 123;
   //   std::unordered_map<std::uint64_t, std::array<bool, 7>> users;
@@ -36,19 +36,22 @@ int main() {
   auto file = client.open(
       "file", static_cast<rpc::schema::mode_t>(std::ios::in | std::ios::out));
   std::vector<std::uint8_t> bytes{40, 50, 10, 13, 50};
-  std::cout << "file opened\n";
-  client.write(file, bytes.size(), bytes);
-  std::cout << "written\n";
+  std::cout << "file opened with desc " << file << "\n";
+  auto r = client.write(file, bytes.size(), bytes);
+  std::cout << r << " bytes written\n";
   client.lseek(file, 2, static_cast<std::uint32_t>(std::ios::beg));
   std::cout << "seeked\n";
   std::vector<std::uint8_t> respBytes{};
-  client.read(file, 3, respBytes);
-  std::cout << "read\n";
+  auto num = client.read(file, 3, respBytes);
+  std::cout << num << " bytes read\n";
   for (const auto num : respBytes) {
     std::cout << " " << static_cast<std::uint32_t>(num);
   }
   std::cout << "\n";
   client.chmod("file", static_cast<std::uint32_t>(std::filesystem::perms::all));
+  std::cout << "chmod\n";
   client.rename("file", "newfile");
+  std::cout << "rename\n";
   client.unlink("newfile");
+  std::cout << "unlink\n";
 }

@@ -61,14 +61,15 @@ void Server::run() {
     while (this->running) {
       std::vector<std::uint8_t> buffer(240, 0);
       udp::endpoint remote_endpoint;
+      // TODO: add timeout and retry
       socket.receive_from(asio::buffer(buffer), remote_endpoint);
-      std::cout << "client received\n";
+      std::cout << "server received\n";
 
       std::vector<std::uint8_t> message = handler(buffer);
 
       std::error_code ignored_error;
       socket.send_to(asio::buffer(message), remote_endpoint, 0, ignored_error);
-      std::cout << "client sent\n";
+      std::cout << "server sent\n";
     }
   } catch (std::exception& e) {
     std::cerr << e.what() << std::endl;

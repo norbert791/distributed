@@ -211,14 +211,14 @@ schema::Request unmarshalRequest(std::vector<std::uint8_t> bytes) {
   }
   case Type::CHMOD: {
     schema::ChmodRequest req{};
-    readScalar(it, req.pathname);
+    readString(it, req.pathname);
     readScalar(it, req.mode);
     body = req;
     break;
   }
   case Type::UNLINK: {
     schema::UnlinkRequest req{};
-    readScalar(it, req.pathname);
+    readString(it, req.pathname);
     body = req;
     break;
   }
@@ -261,9 +261,13 @@ schema::Response unmarshalResponse(std::vector<std::uint8_t> bytes) {
   case Type::READ: {
     schema::ReadResponse res{};
     readScalar(it, res.read);
-    res.bytes = std::vector<std::uint8_t>(res.read, 0);
-    std::copy(it, it + res.read, res.bytes.begin());
-    it += res.read;
+    if (res.read > 0) {
+      res.bytes = std::vector<std::uint8_t>(res.read, 0);
+      std::copy(it, it + res.read, res.bytes.begin());
+      it += res.read;
+    } else {
+      res.bytes = {};
+    }
     body = res;
     break;
   }
