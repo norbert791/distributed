@@ -48,9 +48,13 @@ struct RenameRequest final {
   std::string newpath;
 };
 
+struct CloseRequest final {
+  File desc;
+};
+
 using RequestBody =
     std::variant<OpenRequest, ReadRequest, WriteRequest, LSeekRequest,
-                 ChmodRequest, UnlinkRequest, RenameRequest>;
+                 ChmodRequest, UnlinkRequest, RenameRequest, CloseRequest>;
 
 struct OpenResponse final {
   File file;
@@ -81,9 +85,13 @@ struct RenameResponse final {
   std::int64_t result;
 };
 
+struct CloseResponse final {
+  std::int64_t result;
+};
+
 using ResponseBody =
     std::variant<OpenResponse, ReadResponse, WriteResponse, LSeekResponse,
-                 ChmodResponse, UnlinkResponse, RenameResponse>;
+                 ChmodResponse, UnlinkResponse, RenameResponse, CloseResponse>;
 
 enum class Code : uint8_t {
   OK,
@@ -103,8 +111,6 @@ struct Request final {
   Header header;
   RequestBody body;
 };
-
-// TODO: Replace header with id?
 
 struct Response final {
   uint64_t id;

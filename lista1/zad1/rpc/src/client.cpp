@@ -73,5 +73,12 @@ std::int64_t Client::rename(std::string oldpath, std::string newpath) {
   return result.result;
 }
 
+std::int64_t Client::close(schema::File desc) {
+  schema::CloseRequest req{.desc = desc};
+  schema::ResponseBody resp = this->sendBody(req);
+  auto result = std::get<schema::CloseResponse>(resp);
+  return result.result;
+}
+
 } // namespace client
 } // namespace rpc

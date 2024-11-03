@@ -16,9 +16,9 @@ int main() {
   rpc::server::Handlers handlers{fsystem.generateHandlers()};
   std::uint64_t token = 123;
   //   std::unordered_map<std::uint64_t, std::array<bool, 7>> users;
-  std::array<bool, 7> perms;
+  std::array<bool, 8> perms;
   perms.fill(true);
-  std::unordered_map<std::uint64_t, std::array<bool, 7>> users{{token, perms}};
+  std::unordered_map<std::uint64_t, std::array<bool, 8>> users{{token, perms}};
   auto protoServ = std::make_shared<rpc::udp::Server>();
   rpc::server::Server serv{handlers, protoServ, users};
 
@@ -48,6 +48,8 @@ int main() {
     std::cout << " " << static_cast<std::uint32_t>(num);
   }
   std::cout << "\n";
+  auto status = client.close(file);
+  std::cout << "file closed with code: " << status << "\n";
   client.chmod("file", static_cast<std::uint32_t>(std::filesystem::perms::all));
   std::cout << "chmod\n";
   client.rename("file", "newfile");

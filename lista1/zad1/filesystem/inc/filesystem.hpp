@@ -1,6 +1,7 @@
 #ifndef FILESYSTEM_HPP
 #define FILESYSTEM_HPP
 
+#include "schema.hpp"
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -25,6 +26,7 @@ public:
   std::int64_t chmod(std::string pathname, std::uint32_t mode);
   std::int64_t unlink(std::string pathname);
   std::int64_t rename(std::string oldpath, std::string newpath);
+  std::int64_t close(rpc::schema::File desc);
 
   rpc::server::Handlers generateHandlers();
 

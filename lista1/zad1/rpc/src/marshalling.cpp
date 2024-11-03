@@ -20,6 +20,7 @@ enum class Type : std::uint8_t {
   CHMOD,
   UNLINK,
   RENAME,
+  CLOSE,
 };
 
 // TODO: concept/check for POD?
@@ -119,6 +120,9 @@ std::vector<std::uint8_t> marshalRequest(schema::Request req) {
     writeScalar(resultIt, Type::RENAME);
     writeString(resultIt, body->oldpath);
     writeString(resultIt, body->newpath);
+  } else if (auto body = std::get_if<CloseRequest>(&req.body)) {
+    writeScalar(resultIt, Type::CLOSE);
+    writeScalar(resultIt, body->desc);
   } else {
     throw std::invalid_argument("Unknown type");
   }
@@ -158,6 +162,11 @@ std::vector<std::uint8_t> marshalResponse(schema::Response resp) {
   } else if (auto body = std::get_if<RenameResponse>(&resp.body)) {
     writeScalar(resultIt, Type::RENAME);
     writeScalar(resultIt, body->result);
+  } else if (auto body = std::get_if<CloseResponse>(&resp.body)) {
+    writeScalar(resultIt, Type::CLOSE);
+    writeScalar(resultIt, body->result);
+  } else {
+    throw std::invalid_argument("invalid body");
   }
 
   return result;
@@ -229,6 +238,12 @@ schema::Request unmarshalRequest(std::vector<std::uint8_t> bytes) {
     body = req;
     break;
   }
+  case Type::CLOSE: {
+    schema::CloseRequest req{};
+    readScalar(it, req.desc);
+    body = req;
+    break;
+  }
   default:
     throw std::invalid_argument("Invalid message type");
   }
@@ -297,6 +312,12 @@ schema::Response unmarshalResponse(std::vector<std::uint8_t> bytes) {
   }
   case Type::RENAME: {
     schema::RenameResponse res{};
+    readScalar(it, res.result);
+    body = res;
+    break;
+  }
+  case Type::CLOSE: {
+    schema::CloseResponse res{};
     readScalar(it, res.result);
     body = res;
     break;

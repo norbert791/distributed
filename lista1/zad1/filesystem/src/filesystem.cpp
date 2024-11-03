@@ -1,3 +1,4 @@
+#include "schema.hpp"
 #include "server.hpp"
 #include <exception>
 #include <filesystem.hpp>
@@ -102,7 +103,18 @@ std::int64_t Filesystem::rename(std::string oldpath, std::string newpath) {
   } catch (const std::exception& e) {
     return -1;
   }
-  // TODO: add exception handling
+
+  return 0;
+}
+
+std::int64_t Filesystem::close(rpc::schema::File desc) {
+  try {
+    auto& file = this->files.at(desc);
+    file.close();
+    this->files.erase(desc);
+  } catch (const std::exception& e) {
+    return -1;
+  }
 
   return 0;
 }
@@ -117,6 +129,7 @@ rpc::server::Handlers Filesystem::generateHandlers() {
       .ChmodHandler = std::bind(&Filesystem::chmod, this, _1, _2),
       .UnlinkHandler = std::bind(&Filesystem::unlink, this, _1),
       .RenameHandler = std::bind(&Filesystem::rename, this, _1, _2),
+      .CloseHandler = std::bind(&Filesystem::close, this, _1),
   };
 }
 

@@ -26,6 +26,7 @@ public:
   std::int64_t chmod(std::string pathname, std::uint32_t mode);
   std::int64_t unlink(std::string pathname);
   std::int64_t rename(std::string oldpath, std::string newpath);
+  std::int64_t close(schema::File desc);
 
 private:
   const std::uint64_t auth{0};

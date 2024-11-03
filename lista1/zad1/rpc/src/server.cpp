@@ -51,6 +51,10 @@ rpc::protocol::handler Server::makeHandler() {
       RenameResponse res;
       res.result = this->RenameHandler(it->oldpath, it->newpath);
       response.body = res;
+    } else if (auto it = std::get_if<CloseRequest>(&request.body)) {
+      CloseResponse res;
+      res.result = this->CloseHandler(it->desc);
+      response.body = res;
     } else {
       throw std::invalid_argument("Invalid request type");
     }

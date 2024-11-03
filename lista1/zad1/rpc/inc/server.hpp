@@ -32,9 +32,10 @@ struct Handlers {
   std::function<std::int64_t(std::string pathname)> UnlinkHandler;
   std::function<std::int64_t(std::string oldpath, std::string newpath)>
       RenameHandler;
+  std::function<std::int64_t(schema::File desc)> CloseHandler;
 };
 
-using Permissions = std::array<bool, 7>;
+using Permissions = std::array<bool, 8>;
 
 class Server : public Handlers {
 public:

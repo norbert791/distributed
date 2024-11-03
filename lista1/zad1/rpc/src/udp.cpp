@@ -1,9 +1,12 @@
 #include "asio/io_context.hpp"
 #include "asio/ip/address_v4.hpp"
 #include <asio.hpp>
+#include <chrono>
 #include <cstdint>
 #include <exception>
+#include <future>
 #include <iostream>
+#include <stdexcept>
 #include <udp.hpp>
 #include <vector>
 
@@ -25,12 +28,30 @@ Client::makeRequest(const std::vector<std::uint8_t>& data) {
     std::cout << "client sent\n";
     socket.send_to(asio::buffer(data), endpoint);
 
-    std::vector<std::uint8_t> result(24, 0);
+    std::vector<std::uint8_t> result(1024, 0);
     udp::endpoint senderEndpoint;
-    socket.receive_from(asio::buffer(result), senderEndpoint);
-    std::cout << "client received\n";
-
-    return result;
+    auto status = std::async(std::launch::async, [&]() {
+                    socket.receive_from(asio::buffer(result), senderEndpoint);
+                  }).wait_for(std::chrono::seconds{5});
+    if (status == std::future_status::ready) {
+      std::cout << "client received\n";
+      return result;
+    }
+    if (status != std::future_status::timeout) {
+      throw std::logic_error("unknown status");
+    }
+    std::vector<std::uint8_t> result2(1024, 0);
+    status = std::async(std::launch::async, [&]() {
+               socket.receive_from(asio::buffer(result2), senderEndpoint);
+             }).wait_for(std::chrono::seconds{15});
+    if (status == std::future_status::ready) {
+      std::cout << "client received\n";
+      return result;
+    }
+    if (status != std::future_status::timeout) {
+      throw std::logic_error("unknown status");
+    }
+    throw std::runtime_error("timeout");
   } catch (std::exception& e) {
     std::cerr << e.what() << std::endl;
   }
