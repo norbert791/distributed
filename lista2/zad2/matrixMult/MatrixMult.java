@@ -48,15 +48,19 @@ public class MatrixMult {
 
         if (left) {
           for (int i = 0; i < cols; i++) {
-            String keyStr = String.valueOf(currRow) + " " + String.valueOf(i);
-            outVal.set(val + " left " + String.valueOf(currRow));
+            String keyStr = String.valueOf(currRow) + "," + String.valueOf(i);
+            String valStr = String.valueOf(val) + "," + String.valueOf(currRow);
+            System.out.println(keyStr + "::" + valStr);
+            outVal.set(valStr);
             outKey.set(keyStr);
             context.write(outKey, outVal);
           }
         } else {
           for (int i = 0; i < rows; i++) {
-            String keyStr = String.valueOf(i) + " " + String.valueOf(currCol);
-            outVal.set(val + " right " + String.valueOf(currCol));
+            String keyStr = String.valueOf(i) + "," + String.valueOf(currCol);
+            String valStr = String.valueOf(val) + "," + String.valueOf(currCol);
+            System.out.println(keyStr + "::" + valStr);
+            outVal.set(valStr);
             outKey.set(keyStr);
             context.write(outKey, outVal);
           }
@@ -66,22 +70,22 @@ public class MatrixMult {
   }
 
   public static class IntSumReducer
-       extends Reducer<Text,Text,Text,IntWritable> {
+       extends Reducer<Text,Text,Text,Text> {
     private Text result = new Text();
-    private IntWritable resVal = new IntWritable();
-    private HashMap<Integer, Integer> map = new HashMap();
+    private Text resVal = new Text();
 
     public void reduce(Text key, Iterable<Text> values,
                        Context context
                        ) throws IOException, InterruptedException {
-      
+      HashMap<Integer, Integer> map = new HashMap();
       for (Text v : values) {
-        String[] arr = v.toString().split(" ");
+        System.out.println(v.toString());
+        String[] arr = v.toString().split(",");
         int v2 = Integer.parseInt(arr[0]);
-        int index = Integer.parseInt(arr[2]);
-        int temp = map.getOrDefault(new Integer(index), new Integer(1)).intValue();
+        int index = Integer.parseInt(arr[1]);
+        int temp = map.getOrDefault(index, new Integer(1)).intValue();
         temp *= v2;
-        map.put(new Integer(index), temp);
+        map.put(index, temp);
       }
       
       int sum = 0;
@@ -89,8 +93,9 @@ public class MatrixMult {
         sum += v;
       }
 
-      resVal.set(sum);
+      resVal.set(String.valueOf(sum));
       result.set(key);
+      System.out.println("resVal: " + String.valueOf(sum));
       context.write(result, resVal);
     }
   }
@@ -100,10 +105,10 @@ public class MatrixMult {
     Job job = Job.getInstance(conf, "word count");
     job.setJarByClass(MatrixMult.class);
     job.setMapperClass(TokenizerMapper.class);
-    job.setCombinerClass(IntSumReducer.class);
+    // job.setCombinerClass(IntSumReducer.class);
     job.setReducerClass(IntSumReducer.class);
     job.setOutputKeyClass(Text.class);
-    job.setOutputValueClass(IntWritable.class);
+    job.setOutputValueClass(Text.class);
     FileInputFormat.addInputPath(job, new Path(args[0]));
     FileOutputFormat.setOutputPath(job, new Path(args[1]));
     System.exit(job.waitForCompletion(true) ? 0 : 1);
