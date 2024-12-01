@@ -21,16 +21,15 @@ RUN cp $HADOOP_HOME/etc/hadoop/*.xml input
 RUN $HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.4.1.jar grep input output 'dfs[a-z.]+'
 RUN cat output/*
 
-COPY InvertedIndex.java InvertedIndex.java
-COPY input/file1.txt /user/norbert/input/file1.txt
-COPY input/file2.txt /user/norbert/input/file2.txt
-COPY input/file3.txt /user/norbert/input/file3.txt
+COPY MatrixMult.java MatrixMult.java
+COPY input/left_5_3.txt /user/norbert/input/left_5_3.txt
+COPY input/right_3_5.txt /user/norbert/input/right_3_5.txt
 
 
-RUN $HADOOP_HOME/bin/hadoop com.sun.tools.javac.Main InvertedIndex.java
-RUN jar cf wc.jar InvertedIndex*.class
+RUN $HADOOP_HOME/bin/hadoop com.sun.tools.javac.Main MatrixMult.java
+RUN jar cf wc.jar MatrixMult*.class
 
-CMD ${HADOOP_HOME}/bin/hadoop jar wc.jar InvertedIndex /user/norbert/input /user/norbert/output && cat /user/norbert/output/*
+CMD ${HADOOP_HOME}/bin/hadoop jar wc.jar MatrixMult /user/norbert/input /user/norbert/output && cat /user/norbert/output/*
 
 # Start Hadoop and expose necessary ports
 # EXPOSE 9870 8088
