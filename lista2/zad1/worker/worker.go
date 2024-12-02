@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
-	"time"
 )
 
 func performMapping(inputPath, outputPath string) error {
@@ -85,44 +83,40 @@ func performReduce(inputPath, outputPath string) error {
 }
 
 func main() {
-
-	wg := sync.WaitGroup{}
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		ticker := time.Tick(30 * time.Second)
-		for range ticker {
-			fmt.Println("heartbeat")
+	defer func() {
+		rec := recover()
+		if v, ok := rec.(error); ok {
+			fmt.Printf("error: %s\n", v)
 		}
 	}()
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		text := scanner.Text()
+		splitted := strings.Split(text, " ")
 
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-			text := scanner.Text()
-			splitted := strings.Split(text, ":")
+		command := splitted[0]
 
-			command := splitted[0]
-
-			switch command {
-			case "map":
-				input := splitted[1]
-				otput := splitted[2]
-				performMapping(input, otput)
-			case "reduce":
-				input := splitted[1]
-				otput := splitted[2]
-				performReduce(input, otput)
-			case "done":
-				return
-			}
+		var err error
+		switch command {
+		case "map":
+			input := splitted[1]
+			otput := splitted[2]
+			err = performMapping(input, otput)
+		case "reduce":
+			input := splitted[1]
+			otput := splitted[2]
+			err = performReduce(input, otput)
+		case "done":
+			return
+		default:
+			fmt.Println("error: unknown command")
 		}
-	}()
 
-	wg.Wait()
-
+		if err != nil {
+			fmt.Printf("error: %s\n", err)
+		} else {
+			fmt.Println("ok")
+		}
+	}
 }

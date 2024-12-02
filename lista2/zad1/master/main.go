@@ -6,13 +6,115 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 )
 
-func combineMappings(filenames []string, writer io.Writer) error {
+func main() {
+	args := os.Args
+	if len(args) != 5 {
+		fmt.Println("invalid number of args")
+		return
+	}
+
+	binPath := args[1]
+	workers, err := strconv.ParseUint(args[2], 10, 64)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	filepath := args[3]
+	outpath := args[4]
+
+	workdir, err := os.MkdirTemp("", "mapReduce")
+	if err != nil {
+		if !errors.Is(err, fs.ErrExist) {
+			fmt.Println(err)
+			return
+		}
+	}
+	defer os.RemoveAll(workdir)
+
+	mapInputs := make([]string, 0, workers)
+	mapOutputs := make([]string, 0, workers)
+	reduceInputs := make([]string, 0, workers)
+	reduceOutputs := make([]string, 0, workers)
+	for i := range workers {
+		mapInputs = append(mapInputs, path.Join(workdir, fmt.Sprintf("map-input-%d", i)))
+		mapOutputs = append(mapOutputs, path.Join(workdir, fmt.Sprintf("map-output-%d", i)))
+		reduceInputs = append(reduceInputs, path.Join(workdir, fmt.Sprintf("reduce-input-%d", i)))
+		reduceOutputs = append(reduceOutputs, path.Join(workdir, fmt.Sprintf("reduce-output-%d", i)))
+	}
+	err = ShardInput(mapInputs, filepath)
+	if err != nil {
+		fmt.Println("sharding failed", err)
+		return
+	}
+
+	fmt.Println("sharding complete")
+
+	// Setup workers
+	pool, err := WorkerPoolOpen(uint(workers), binPath)
+	if err != nil {
+		fmt.Println("worker setup failed", err)
+		return
+	}
+
+	defer func() {
+		if err := pool.Close(); err != nil {
+			panic(err)
+		}
+	}()
+
+	fmt.Println("workers started")
+
+	// Run mappers
+	err = pool.Map(mapInputs, mapOutputs)
+	if err != nil {
+		fmt.Println("map failed", err)
+		return
+	}
+
+	fmt.Println("Mappers finished")
+
+	err = ShuffleMapped(mapOutputs, reduceInputs)
+	if err != nil {
+		fmt.Println("shuffle failed", err)
+		return
+	}
+
+	fmt.Println("shuffle finished")
+
+	// Run reducers
+	err = pool.Reduce(reduceInputs, reduceOutputs)
+	if err != nil {
+		fmt.Println("reduce failed")
+		return
+	}
+
+	fmt.Println("Reducers finished")
+
+	outputFile, err := os.Create(outpath)
+	if err != nil {
+		fmt.Println("combine file create failed", err)
+		return
+	}
+	defer outputFile.Close()
+
+	err = CombineResults(reduceOutputs, outputFile)
+	if err != nil {
+		fmt.Println("combine failed", err)
+		return
+	}
+
+	fmt.Println("Combined")
+}
+
+func CombineResults(filenames []string, writer io.Writer) error {
 	for _, name := range filenames {
 		err := func() error {
 			f, err := os.Open(name)
@@ -40,7 +142,7 @@ func combineMappings(filenames []string, writer io.Writer) error {
 	return nil
 }
 
-func shardInput(filenames []string, input string) error {
+func ShardInput(filenames []string, input string) error {
 	inputFile, err := os.Open(input)
 	if err != nil {
 		return err
@@ -73,7 +175,7 @@ func shardInput(filenames []string, input string) error {
 	return nil
 }
 
-func shuffleMapped(input []string, output []string) error {
+func ShuffleMapped(input []string, output []string) error {
 	outputFiles := make([]*os.File, len(input))
 	for i, name := range output {
 		var err error
@@ -124,58 +226,4 @@ func shuffleMapped(input []string, output []string) error {
 	}
 
 	return nil
-}
-
-func main() {
-	args := os.Args
-	if len(args) != 3 {
-		fmt.Println("invalid number of args")
-		return
-	}
-
-	filepath := args[1]
-	workers, err := strconv.ParseUint(args[2], 10, 64)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	workdir := ".mapReduce"
-	err = os.Mkdir(workdir, os.ModeDir)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	mapInputs := make([]string, 0, workers)
-	mapOutputs := make([]string, 0, workers)
-	reduceInputs := make([]string, 0, workers)
-	reduceOutputs := make([]string, 0, workers)
-	for i := range workers {
-		mapInputs = append(mapInputs, path.Join(workdir, fmt.Sprintf("map-input-%d", i)))
-		mapOutputs = append(mapOutputs, path.Join(workdir, fmt.Sprintf("map-output-%d", i)))
-	}
-	err = shardInput(mapInputs, filepath)
-	if err != nil {
-		fmt.Println("sharding failed")
-		return
-	}
-	// Setup workers
-
-	// Run mappers
-
-	err = shuffleMapped(mapOutputs, reduceInputs)
-	if err != nil {
-		fmt.Println("shuffle failed")
-		return
-	}
-	// Run reducers
-
-	err = combineMappings(reduceOutputs, os.Stdout)
-	if err != nil {
-		fmt.Println("combine failed")
-		return
-	}
-
-	// Close reducers
 }
