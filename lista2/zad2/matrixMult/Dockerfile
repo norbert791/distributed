@@ -22,8 +22,8 @@ RUN $HADOOP_HOME/bin/hadoop jar $HADOOP_HOME/share/hadoop/mapreduce/hadoop-mapre
 RUN cat output/*
 
 COPY MatrixMult.java MatrixMult.java
-COPY input/left_5_3.txt /user/norbert/input/left_5_3.txt
-COPY input/right_3_5.txt /user/norbert/input/right_3_5.txt
+COPY input/A_2_2.txt /user/norbert/input/A_2_2.txt
+COPY input/B_2_2.txt /user/norbert/input/B_2_2.txt
 
 
 RUN $HADOOP_HOME/bin/hadoop com.sun.tools.javac.Main MatrixMult.java

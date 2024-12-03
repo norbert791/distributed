@@ -1,5 +1,4 @@
 import java.io.IOException;
-import java.util.StringTokenizer;
 import java.util.HashMap;
 
 import org.apache.hadoop.conf.Configuration;
@@ -15,102 +14,95 @@ import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 
 public class MatrixMult {
 
-  public static class TokenizerMapper
-       extends Mapper<Object, Text, Text, Text>{
+    // Mapper Class
+    public static class MatrixMapper extends Mapper<Object, Text, Text, Text> {
+        private Text outputKey = new Text();
+        private Text outputValue = new Text();
 
-    private Text outVal = new Text();
-    private Text outKey = new Text();
+        @Override
+        public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
+            String line = value.toString();
+            String[] parts = line.split(",");
+            String matrixName = parts[0];
+            int i = Integer.parseInt(parts[1]);
+            int j = Integer.parseInt(parts[2]);
+            int valueMatrix = Integer.parseInt(parts[3]);
+            String fileName = ((FileSplit) context.getInputSplit()).getPath().getName();
+            String[] splittedName = fileName.split("_");
+            int numOfRows = Integer.parseInt(splittedName[1]);
+            int numOfCols = Integer.parseInt(splittedName[2].substring(0, splittedName[2].length() - 4));
 
-    public void map(Object key, Text value, Context context
-                    ) throws IOException, InterruptedException {
-      String name = ((FileSplit) context.getInputSplit()).getPath().getName();
-      StringTokenizer itr = new StringTokenizer(value.toString(), " ");
-    
-      boolean left = false;
-      if (name.startsWith("left")) {
-        left = true;
-      }
-
-      name = name.substring(0, name.length() - 4);
-      String[] names = name.split("_");
-      int rows = Integer.parseInt(names[1]);
-      int cols = Integer.parseInt(names[2]);
-      int currRow = 0;
-      int currCol = 0;
-      while (itr.hasMoreTokens()) {
-        String tok = itr.nextToken();
-        if (tok == "\n") {
-          currRow++;
-          continue;
+            if (matrixName.equals("A")) {
+                // Emit keys for A(i, k) where k is the column index in the output
+                for (int k = 0; k < numOfCols; k++) { // assume P = 100 (cols in B)
+                    outputKey.set(i + "," + k);
+                    outputValue.set("A," + j + "," + valueMatrix);
+                    context.write(outputKey, outputValue);
+                }
+            } else if (matrixName.equals("B")) {
+                // Emit keys for B(k, j) where k is the row index in A
+                for (int k = 0; k < numOfRows; k++) { // assume M = 100 (rows in A)
+                    outputKey.set(k + "," + j);
+                    outputValue.set("B," + i + "," + valueMatrix);
+                    context.write(outputKey, outputValue);
+                }
+            }
         }
+    }
 
-        int val = Integer.parseInt(tok);
+    // Reducer Class
+    public static class MatrixReducer extends Reducer<Text, Text, Text, IntWritable> {
+        @Override
+        public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
+            HashMap<Integer, Integer> map = new HashMap();
+            HashMap<Integer, Integer> modifiedMap = new HashMap();
 
-        if (left) {
-          for (int i = 0; i < cols; i++) {
-            String keyStr = String.valueOf(currRow) + "," + String.valueOf(i);
-            String valStr = String.valueOf(val) + "," + String.valueOf(currRow);
-            System.out.println(keyStr + "::" + valStr);
-            outVal.set(valStr);
-            outKey.set(keyStr);
-            context.write(outKey, outVal);
-          }
-        } else {
-          for (int i = 0; i < rows; i++) {
-            String keyStr = String.valueOf(i) + "," + String.valueOf(currCol);
-            String valStr = String.valueOf(val) + "," + String.valueOf(currCol);
-            System.out.println(keyStr + "::" + valStr);
-            outVal.set(valStr);
-            outKey.set(keyStr);
-            context.write(outKey, outVal);
-          }
+            for (Text value : values) {
+                String[] parts = value.toString().split(",");
+                if (parts[0].equals("A")) {
+                    int index = Integer.parseInt(parts[1]);
+                    int temp = map.getOrDefault(index, 1);
+                    map.put(index, temp * Integer.parseInt(parts[2]));
+                    int modified = modifiedMap.getOrDefault(index, 0);
+                    modifiedMap.put(index, modified+1);
+                } else if (parts[0].equals("B")) {
+                    int index = Integer.parseInt(parts[1]);
+                    int temp = map.getOrDefault(index, 1);
+                    map.put(index, temp * Integer.parseInt(parts[2]));
+                    int modified = modifiedMap.getOrDefault(index, 0);
+                    modifiedMap.put(index, modified+1);
+                }
+            }
+
+            int sum = 0;
+            for (int k : map.keySet()) {
+                if (modifiedMap.getOrDefault(k, 0) < 2) {
+                  continue;
+                }
+                int val = map.get(k);
+                sum += val;
+            }
+            if (sum != 0) {
+              context.write(key, new IntWritable(sum));
+            }
         }
-      }
     }
-  }
 
-  public static class IntSumReducer
-       extends Reducer<Text,Text,Text,Text> {
-    private Text result = new Text();
-    private Text resVal = new Text();
+    public static void main(String[] args) throws Exception {
+        Configuration conf = new Configuration();
+        Job job = Job.getInstance(conf, "matrix multiplication");
 
-    public void reduce(Text key, Iterable<Text> values,
-                       Context context
-                       ) throws IOException, InterruptedException {
-      HashMap<Integer, Integer> map = new HashMap();
-      for (Text v : values) {
-        System.out.println(v.toString());
-        String[] arr = v.toString().split(",");
-        int v2 = Integer.parseInt(arr[0]);
-        int index = Integer.parseInt(arr[1]);
-        int temp = map.getOrDefault(index, new Integer(1)).intValue();
-        temp *= v2;
-        map.put(index, temp);
-      }
-      
-      int sum = 0;
-      for (Integer v : map.values()) {
-        sum += v;
-      }
+        job.setJarByClass(MatrixMult.class);
+        job.setMapperClass(MatrixMapper.class);
+        job.setReducerClass(MatrixReducer.class);
+        job.setMapOutputKeyClass(Text.class);
+        job.setMapOutputValueClass(Text.class);
+        job.setOutputKeyClass(Text.class);
+        job.setOutputValueClass(IntWritable.class);
 
-      resVal.set(String.valueOf(sum));
-      result.set(key);
-      System.out.println("resVal: " + String.valueOf(sum));
-      context.write(result, resVal);
+        FileInputFormat.addInputPath(job, new Path(args[0]));
+        FileOutputFormat.setOutputPath(job, new Path(args[1]));
+
+        System.exit(job.waitForCompletion(true) ? 0 : 1);
     }
-  }
-
-  public static void main(String[] args) throws Exception {
-    Configuration conf = new Configuration();
-    Job job = Job.getInstance(conf, "word count");
-    job.setJarByClass(MatrixMult.class);
-    job.setMapperClass(TokenizerMapper.class);
-    // job.setCombinerClass(IntSumReducer.class);
-    job.setReducerClass(IntSumReducer.class);
-    job.setOutputKeyClass(Text.class);
-    job.setOutputValueClass(Text.class);
-    FileInputFormat.addInputPath(job, new Path(args[0]));
-    FileOutputFormat.setOutputPath(job, new Path(args[1]));
-    System.exit(job.waitForCompletion(true) ? 0 : 1);
-  }
 }
