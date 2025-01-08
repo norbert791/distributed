@@ -2,22 +2,38 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import networkx as nx
 import numpy as np
+from process import Process
 from typing import Dict, List, Tuple
 import math
 import os
-import time  # Added missing import
-from process import Process
+import time
 from snapshot import SnapshotManager
 
 class SystemVisualizer:
     def __init__(self, processes: Dict[int, Process]):
         self.processes = processes
-        self.fig, (self.ax1, self.ax2) = plt.subplots(1, 2, figsize=(15, 7))
+        # Increase figure size and adjust subplot ratio
+        self.fig = plt.figure(figsize=(20, 10))
+        # Create grid spec to control subplot sizes
+        gs = self.fig.add_gridspec(1, 2, width_ratios=[1.2, 0.8])
+        self.ax1 = self.fig.add_subplot(gs[0])  # Network topology (larger)
+        self.ax2 = self.fig.add_subplot(gs[1])  # State chart
+        
         self.graph = nx.DiGraph()
         self.pos = None
         self.message_lines = []
         self.state_text = []
         self.snapshot_data = None
+        
+        # Color scheme
+        self.colors = {
+            'node_normal': '#ADD8E6',      # Light blue
+            'node_snapshot': '#90EE90',     # Light green
+            'node_border': '#4169E1',      # Royal blue
+            'edge': '#808080',             # Gray
+            'text': '#000000',             # Black
+            'marker': '#FF6B6B'            # Coral for markers
+        }
         
         # Create data directory if it doesn't exist
         self.data_dir = os.path.join(os.getcwd(), "data")
@@ -27,7 +43,7 @@ class SystemVisualizer:
         self._init_graph()
         
     def _init_graph(self):
-        """Initialize the network graph."""
+        """Initialize the network graph with improved layout."""
         # Add nodes
         for pid in self.processes:
             self.graph.add_node(pid)
@@ -37,68 +53,125 @@ class SystemVisualizer:
             for target_pid in process.outgoing_channels:
                 self.graph.add_edge(pid, target_pid)
         
-        # Calculate layout (positions of nodes)
-        self.pos = nx.spring_layout(self.graph)
+        # Calculate layout based on number of nodes
+        num_nodes = len(self.processes)
+        if num_nodes <= 10:
+            self.pos = nx.circular_layout(self.graph, scale=2)
+        else:
+            # For larger networks, use force-directed layout with adjusted parameters
+            self.pos = nx.spring_layout(
+                self.graph,
+                k=1/math.sqrt(num_nodes),  # Adjust spacing
+                iterations=50,              # More iterations for better layout
+                scale=2                     # Larger scale
+            )
         
     def _draw_network(self, snapshot_in_progress=False):
-        """Draw the network topology."""
+        """Draw the network topology with improved visibility."""
         self.ax1.clear()
-        self.ax1.set_title("Network Topology")
+        self.ax1.set_title("Network Topology", pad=20, fontsize=14)
+        
+        # Calculate node size based on number of nodes
+        num_nodes = len(self.processes)
+        node_size = max(3000 / math.sqrt(num_nodes), 500)
+        font_size = max(10 / math.log10(num_nodes + 1), 8)
         
         # Draw nodes
         node_colors = []
+        node_borders = []
         for node in self.graph.nodes():
             if snapshot_in_progress and self.processes[node].snapshot_in_progress:
-                node_colors.append('lightgreen')
+                node_colors.append(self.colors['node_snapshot'])
             else:
-                node_colors.append('lightblue')
+                node_colors.append(self.colors['node_normal'])
+            node_borders.append(self.colors['node_border'])
         
-        nx.draw_networkx_nodes(self.graph, self.pos, 
+        # Draw nodes with borders
+        nx.draw_networkx_nodes(self.graph, self.pos,
                              node_color=node_colors,
-                             node_size=1000,
+                             node_size=node_size,
+                             edgecolors=node_borders,
+                             linewidths=2,
                              ax=self.ax1)
         
-        # Draw edges
-        nx.draw_networkx_edges(self.graph, self.pos, 
-                             edge_color='gray',
+        # Draw edges with curved arrows for clarity
+        nx.draw_networkx_edges(self.graph, self.pos,
+                             edge_color=self.colors['edge'],
                              arrows=True,
+                             arrowsize=20,
+                             connectionstyle='arc3,rad=0.2',
                              ax=self.ax1)
         
-        # Draw labels
+        # Draw labels with background for better visibility
         labels = {pid: f"P{pid}\n{self.processes[pid].state}"
                  for pid in self.processes}
-        nx.draw_networkx_labels(self.graph, self.pos, labels, ax=self.ax1)
+        
+        # Add white background to labels for better visibility
+        for node, (x, y) in self.pos.items():
+            self.ax1.text(x, y, labels[node],
+                         horizontalalignment='center',
+                         verticalalignment='center',
+                         fontsize=font_size,
+                         bbox=dict(facecolor='white',
+                                 edgecolor='none',
+                                 alpha=0.7,
+                                 pad=2))
+        
+        # Remove axes
+        self.ax1.set_axis_off()
         
     def _draw_state_chart(self):
-        """Draw the state chart showing process states over time."""
+        """Draw the state chart with improved readability."""
         self.ax2.clear()
-        self.ax2.set_title("Process States")
+        self.ax2.set_title("Process States", pad=20, fontsize=14)
         
         if self.snapshot_data:
             pids = list(self.snapshot_data.keys())
             states = [self.snapshot_data[pid]['local_state'] for pid in pids]
             
-            # Create bar chart
-            bars = self.ax2.bar([f'P{pid}' for pid in pids], states)
+            # Calculate bar width based on number of processes
+            bar_width = 0.8 / max(len(pids), 1)
+            
+            # Create bar chart with custom colors
+            bars = self.ax2.bar([f'P{pid}' for pid in pids], states,
+                              width=bar_width,
+                              color=self.colors['node_normal'],
+                              edgecolor=self.colors['node_border'],
+                              linewidth=2)
             
             # Add value labels on top of bars
             for bar in bars:
                 height = bar.get_height()
                 self.ax2.text(bar.get_x() + bar.get_width()/2., height,
                             f'{int(height)}',
-                            ha='center', va='bottom')
+                            ha='center', va='bottom',
+                            fontsize=10)
             
-            # Add channel state information
-            y_pos = max(states) * 1.2
+            # Add channel state information with improved formatting
+            max_height = max(states) if states else 0
+            y_pos = max_height * 1.2
+            
+            # Calculate font size based on number of processes
+            font_size = max(8 / math.log10(len(pids) + 1), 6)
+            
             for pid, data in self.snapshot_data.items():
-                channel_text = f"P{pid} channels:"
+                channel_info = []
                 for from_pid, messages in data['channel_states'].items():
                     if messages:
-                        channel_text += f"\nFrom P{from_pid}: {len(messages)} msgs"
-                self.ax2.text(pids.index(pid), y_pos, channel_text,
-                            ha='center', va='bottom', fontsize=8)
+                        channel_info.append(f"P{from_pid}: {len(messages)}")
+                
+                if channel_info:
+                    channel_text = f"Msgs: {', '.join(channel_info)}"
+                    self.ax2.text(pids.index(pid), y_pos, channel_text,
+                                ha='center', va='bottom',
+                                fontsize=font_size,
+                                bbox=dict(facecolor='white',
+                                        edgecolor='none',
+                                        alpha=0.7,
+                                        pad=2))
         
-        self.ax2.set_ylabel("State Value")
+        self.ax2.set_ylabel("State Value", fontsize=12)
+        self.ax2.tick_params(axis='both', which='major', labelsize=10)
         
     def update(self, snapshot_data=None):
         """Update the visualization."""
@@ -115,7 +188,7 @@ class SystemVisualizer:
         
     def save(self, filename):
         """Save the visualization to a file."""
-        plt.savefig(filename)
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
         print(f"Saved visualization to {filename}")
 
 class EnhancedSimulation:
