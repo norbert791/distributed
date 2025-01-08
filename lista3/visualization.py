@@ -1,229 +1,219 @@
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import networkx as nx
 import numpy as np
-from process import Process
-from typing import Dict, List, Tuple
-import math
+from typing import Dict, List, Optional
 import os
 import time
+from process import Process
 from snapshot import SnapshotManager
 
 class SystemVisualizer:
     def __init__(self, processes: Dict[int, Process]):
         self.processes = processes
-        # Increase figure size and adjust subplot ratio
-        self.fig = plt.figure(figsize=(20, 10))
-        # Create grid spec to control subplot sizes
-        gs = self.fig.add_gridspec(1, 2, width_ratios=[1.2, 0.8])
-        self.ax1 = self.fig.add_subplot(gs[0])  # Network topology (larger)
-        self.ax2 = self.fig.add_subplot(gs[1])  # State chart
+        # Create a figure with three subplots:
+        # 1. Network state (top left)
+        # 2. Channel states (top right)
+        # 3. Snapshot status (bottom)
+        self.fig = plt.figure(figsize=(20, 15))
+        gs = self.fig.add_gridspec(2, 2, height_ratios=[1, 1])
+        self.ax_network = self.fig.add_subplot(gs[0, 0])  # Network topology
+        self.ax_channels = self.fig.add_subplot(gs[0, 1])  # Channel states
+        self.ax_snapshot = self.fig.add_subplot(gs[1, :])  # Snapshot visualization
         
         self.graph = nx.DiGraph()
         self.pos = None
-        self.message_lines = []
-        self.state_text = []
         self.snapshot_data = None
+        self.snapshot_started = False
+        self.snapshot_start_step = None
         
-        # Color scheme
-        self.colors = {
-            'node_normal': '#ADD8E6',      # Light blue
-            'node_snapshot': '#90EE90',     # Light green
-            'node_border': '#4169E1',      # Royal blue
-            'edge': '#808080',             # Gray
-            'text': '#000000',             # Black
-            'marker': '#FF6B6B'            # Coral for markers
-        }
-        
-        # Create data directory if it doesn't exist
+        # Create data directory
         self.data_dir = os.path.join(os.getcwd(), "data")
         os.makedirs(self.data_dir, exist_ok=True)
         
-        # Initialize the graph
+        # Initialize graph
         self._init_graph()
         
     def _init_graph(self):
-        """Initialize the network graph with improved layout."""
-        # Add nodes
+        """Initialize the network graph."""
         for pid in self.processes:
             self.graph.add_node(pid)
-            
-        # Add edges based on channels
+        
         for pid, process in self.processes.items():
             for target_pid in process.outgoing_channels:
                 self.graph.add_edge(pid, target_pid)
         
-        # Calculate layout based on number of nodes
-        num_nodes = len(self.processes)
-        if num_nodes <= 10:
-            self.pos = nx.circular_layout(self.graph, scale=2)
-        else:
-            # For larger networks, use force-directed layout with adjusted parameters
-            self.pos = nx.spring_layout(
-                self.graph,
-                k=1/math.sqrt(num_nodes),  # Adjust spacing
-                iterations=50,              # More iterations for better layout
-                scale=2                     # Larger scale
-            )
+        self.pos = nx.spring_layout(self.graph)
+    
+    def _draw_network(self, step: int):
+        """Draw the network topology with process states."""
+        self.ax_network.clear()
+        title = f"Network State - Step {step}"
+        if self.snapshot_started:
+            title += "\n(Snapshot in Progress)"
+        self.ax_network.set_title(title, pad=20, fontsize=12)
         
-    def _draw_network(self, snapshot_in_progress=False):
-        """Draw the network topology with improved visibility."""
-        self.ax1.clear()
-        self.ax1.set_title("Network Topology", pad=20, fontsize=14)
-        
-        # Calculate node size based on number of nodes
-        num_nodes = len(self.processes)
-        node_size = max(3000 / math.sqrt(num_nodes), 500)
-        font_size = max(10 / math.log10(num_nodes + 1), 8)
-        
-        # Draw nodes
+        # Draw nodes with different colors based on snapshot state
         node_colors = []
-        node_borders = []
         for node in self.graph.nodes():
-            if snapshot_in_progress and self.processes[node].snapshot_in_progress:
-                node_colors.append(self.colors['node_snapshot'])
+            if self.processes[node].snapshot_in_progress:
+                node_colors.append('lightgreen')
             else:
-                node_colors.append(self.colors['node_normal'])
-            node_borders.append(self.colors['node_border'])
+                node_colors.append('lightblue')
         
-        # Draw nodes with borders
         nx.draw_networkx_nodes(self.graph, self.pos,
                              node_color=node_colors,
-                             node_size=node_size,
-                             edgecolors=node_borders,
-                             linewidths=2,
-                             ax=self.ax1)
+                             node_size=2000,
+                             ax=self.ax_network)
         
-        # Draw edges with curved arrows for clarity
+        # Draw edges
         nx.draw_networkx_edges(self.graph, self.pos,
-                             edge_color=self.colors['edge'],
+                             edge_color='gray',
                              arrows=True,
                              arrowsize=20,
-                             connectionstyle='arc3,rad=0.2',
-                             ax=self.ax1)
+                             ax=self.ax_network)
         
-        # Draw labels with background for better visibility
-        labels = {pid: f"P{pid}\n{self.processes[pid].state}"
+        # Draw labels with process states
+        labels = {pid: f"P{pid}\nState: {self.processes[pid].state}"
                  for pid in self.processes}
+        nx.draw_networkx_labels(self.graph, self.pos, labels,
+                              font_size=10,
+                              ax=self.ax_network)
         
-        # Add white background to labels for better visibility
-        for node, (x, y) in self.pos.items():
-            self.ax1.text(x, y, labels[node],
-                         horizontalalignment='center',
-                         verticalalignment='center',
-                         fontsize=font_size,
-                         bbox=dict(facecolor='white',
-                                 edgecolor='none',
-                                 alpha=0.7,
-                                 pad=2))
+        self.ax_network.set_axis_off()
+    
+    def _draw_channel_states(self):
+        """Draw the current state of all channels."""
+        self.ax_channels.clear()
+        self.ax_channels.set_title("Channel States", pad=20, fontsize=12)
         
-        # Remove axes
-        self.ax1.set_axis_off()
+        num_processes = len(self.processes)
+        matrix = np.zeros((num_processes, num_processes))
         
-    def _draw_state_chart(self):
-        """Draw the state chart with improved readability."""
-        self.ax2.clear()
-        self.ax2.set_title("Process States", pad=20, fontsize=14)
+        # Fill the matrix with channel message counts
+        for pid, process in self.processes.items():
+            for target_pid, channel in process.outgoing_channels.items():
+                matrix[pid-1][target_pid-1] = len(channel.queue)
         
-        if self.snapshot_data:
-            pids = list(self.snapshot_data.keys())
-            states = [self.snapshot_data[pid]['local_state'] for pid in pids]
+        # Create heatmap
+        im = self.ax_channels.imshow(matrix, cmap='YlOrRd')
+        
+        # Add colorbar
+        plt.colorbar(im, ax=self.ax_channels, label='Messages in Channel')
+        
+        # Add labels
+        self.ax_channels.set_xticks(range(num_processes))
+        self.ax_channels.set_yticks(range(num_processes))
+        self.ax_channels.set_xticklabels([f'P{i+1}' for i in range(num_processes)])
+        self.ax_channels.set_yticklabels([f'P{i+1}' for i in range(num_processes)])
+        
+        self.ax_channels.set_xlabel('To Process')
+        self.ax_channels.set_ylabel('From Process')
+        
+        # Add text annotations
+        for i in range(num_processes):
+            for j in range(num_processes):
+                if matrix[i][j] > 0:
+                    self.ax_channels.text(j, i, int(matrix[i][j]),
+                                       ha='center', va='center')
+                    
+        # Mark recording channels
+        for pid, process in self.processes.items():
+            for from_pid, channel in process.incoming_channels.items():
+                if channel.recording:
+                    rect = plt.Rectangle((from_pid-1.5, pid-1.5), 1, 1, fill=False,
+                                      edgecolor='green', linestyle='--', linewidth=2)
+                    self.ax_channels.add_patch(rect)
+    
+    def _draw_snapshot_status(self, step: int):
+        """Draw snapshot progress and recorded states."""
+        self.ax_snapshot.clear()
+        self.ax_snapshot.set_title("Snapshot Status", pad=20, fontsize=12)
+        
+        if not self.snapshot_started:
+            self.ax_snapshot.text(0.5, 0.5, "No Snapshot Started",
+                                ha='center', va='center',
+                                fontsize=12)
+            self.ax_snapshot.set_axis_off()
+            return
+        
+        # Create a table of snapshot data
+        data = []
+        headers = ['Process', 'State', 'Recording Channels', 'Recorded Messages']
+        
+        for pid, process in self.processes.items():
+            recorded_channels = []
+            recorded_msgs = []
             
-            # Calculate bar width based on number of processes
-            bar_width = 0.8 / max(len(pids), 1)
+            for from_pid, channel in process.incoming_channels.items():
+                if channel.recording:
+                    recorded_channels.append(f'P{from_pid}→P{pid}')
+                if hasattr(channel, 'recorded_messages'):
+                    msgs = len(channel.recorded_messages)
+                    if msgs > 0:
+                        recorded_msgs.append(f'P{from_pid}: {msgs}')
             
-            # Create bar chart with custom colors
-            bars = self.ax2.bar([f'P{pid}' for pid in pids], states,
-                              width=bar_width,
-                              color=self.colors['node_normal'],
-                              edgecolor=self.colors['node_border'],
-                              linewidth=2)
-            
-            # Add value labels on top of bars
-            for bar in bars:
-                height = bar.get_height()
-                self.ax2.text(bar.get_x() + bar.get_width()/2., height,
-                            f'{int(height)}',
-                            ha='center', va='bottom',
-                            fontsize=10)
-            
-            # Add channel state information with improved formatting
-            max_height = max(states) if states else 0
-            y_pos = max_height * 1.2
-            
-            # Calculate font size based on number of processes
-            font_size = max(8 / math.log10(len(pids) + 1), 6)
-            
-            for pid, data in self.snapshot_data.items():
-                channel_info = []
-                for from_pid, messages in data['channel_states'].items():
-                    if messages:
-                        channel_info.append(f"P{from_pid}: {len(messages)}")
-                
-                if channel_info:
-                    channel_text = f"Msgs: {', '.join(channel_info)}"
-                    self.ax2.text(pids.index(pid), y_pos, channel_text,
-                                ha='center', va='bottom',
-                                fontsize=font_size,
-                                bbox=dict(facecolor='white',
-                                        edgecolor='none',
-                                        alpha=0.7,
-                                        pad=2))
+            data.append([
+                f'P{pid}',
+                f'{process.snapshot_state if process.snapshot_in_progress else "Not taken"}',
+                ', '.join(recorded_channels) if recorded_channels else 'None',
+                ', '.join(recorded_msgs) if recorded_msgs else 'None'
+            ])
         
-        self.ax2.set_ylabel("State Value", fontsize=12)
-        self.ax2.tick_params(axis='both', which='major', labelsize=10)
+        table = self.ax_snapshot.table(cellText=data,
+                                     colLabels=headers,
+                                     loc='center',
+                                     cellLoc='center')
+        table.auto_set_font_size(False)
+        table.set_fontsize(9)
+        table.scale(1.2, 1.5)
         
-    def update(self, snapshot_data=None):
-        """Update the visualization."""
-        if snapshot_data:
-            self.snapshot_data = snapshot_data
+        if self.snapshot_start_step is not None:
+            self.ax_snapshot.text(0.02, 0.95, 
+                                f'Snapshot started at step {self.snapshot_start_step}',
+                                transform=self.ax_snapshot.transAxes,
+                                fontsize=10)
         
-        self._draw_network(snapshot_data is not None)
-        self._draw_state_chart()
+        self.ax_snapshot.set_axis_off()
+    
+    def update(self, step: int, snapshot_started: bool = False):
+        """Update the visualization with current system state."""
+        if snapshot_started and not self.snapshot_started:
+            self.snapshot_started = True
+            self.snapshot_start_step = step
+            
+        self._draw_network(step)
+        self._draw_channel_states()
+        self._draw_snapshot_status(step)
+        
         plt.tight_layout()
-        
-    def show(self):
-        """Display the visualization."""
-        plt.show()
-        
-    def save(self, filename):
-        """Save the visualization to a file."""
+    
+    def save(self, filename: str):
+        """Save the current visualization to a file."""
         plt.savefig(filename, dpi=300, bbox_inches='tight')
         print(f"Saved visualization to {filename}")
+        
+    def show(self):
+        """Display the current visualization."""
+        plt.show()
 
 class Simulation:
     def __init__(self, num_processes=5):
-        # Create processes
         self.processes = {i: Process(i) for i in range(1, num_processes + 1)}
         
-        # Create connections (fully connected network)
-        connected = set()
-
-        # Create Cn graph
-        for i in range(1, num_processes):
-            p1 = self.processes[i]
-            p2 = self.processes[i+1]
-            p1.connect_to(p2)
-            connected.add((i, i+1))
-        connected.add((num_processes, 0))
-        self.processes[num_processes].connect_to(self.processes[1])
-
-        # Add random edges
+        # Create connections
         for pid1, p1 in self.processes.items():
             for pid2, p2 in self.processes.items():
-                if (pid1, pid2) in connected:
-                    continue
-                if np.random.random() < .3:
+                if pid1 != pid2:  # Full mesh network
                     p1.connect_to(p2)
         
         self.snapshot_manager = SnapshotManager(self.processes)
         self.visualizer = SystemVisualizer(self.processes)
         
     def run_simulation(self, num_steps=10, snapshot_at_step=5):
-        """Run the simulation with visualization."""
+        """Run the simulation with enhanced visualization."""
         print("Starting simulation...")
         
-        # Create a subdirectory for this simulation run
+        # Create run directory
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         run_dir = os.path.join(self.visualizer.data_dir, f"run_{timestamp}")
         os.makedirs(run_dir, exist_ok=True)
@@ -232,11 +222,11 @@ class Simulation:
         for step in range(num_steps):
             print(f"\nStep {step + 1}/{num_steps}")
             
-            # Update process states
+            # Update states
             for p in self.processes.values():
                 p.update_state(np.random.randint(1, 10))
             
-            # Random message passing
+            # Send messages
             for pid1 in self.processes:
                 for pid2 in self.processes:
                     if pid1 != pid2 and np.random.random() < 0.3:
@@ -252,43 +242,16 @@ class Simulation:
                     if message and not message.is_marker:
                         print(f"Process {p.pid} received: {message.content}")
             
-            # Initiate snapshot at specified step
-            if step == snapshot_at_step:
+            # Start snapshot if it's time
+            snapshot_started = step == snapshot_at_step
+            if snapshot_started:
                 print("\nInitiating snapshot from process 1...")
                 self.snapshot_manager.initiate_snapshot(1)
             
-            # Update visualization
-            if self.snapshot_manager.is_snapshot_complete():
-                snapshot_data = self.snapshot_manager.collect_snapshot()
-                self.visualizer.update(snapshot_data)
-            else:
-                self.visualizer.update()
-            
-            # Save frame in run-specific directory
+            # Update and save visualization
+            self.visualizer.update(step, snapshot_started)
             frame_path = os.path.join(run_dir, f"step_{step:03d}.png")
             self.visualizer.save(frame_path)
-        
-        # Final snapshot collection
-        if self.snapshot_manager.is_snapshot_complete():
-            final_snapshot = self.snapshot_manager.collect_snapshot()
-            print("\nFinal Snapshot:")
-            for pid, data in final_snapshot.items():
-                print(f"\nProcess {pid}:")
-                print(f"Local state: {data['local_state']}")
-                print("Channel states:")
-                for from_pid, messages in data['channel_states'].items():
-                    print(f"  From process {from_pid}: {messages}")
             
-            # Save final snapshot data as text
-            snapshot_file = os.path.join(run_dir, "final_snapshot.txt")
-            with open(snapshot_file, "w") as f:
-                f.write("Final Snapshot:\n")
-                for pid, data in final_snapshot.items():
-                    f.write(f"\nProcess {pid}:\n")
-                    f.write(f"Local state: {data['local_state']}\n")
-                    f.write("Channel states:\n")
-                    for from_pid, messages in data['channel_states'].items():
-                        f.write(f"  From process {from_pid}: {messages}\n")
-        
-        # Show final visualization
+        # Show final state
         self.visualizer.show()
