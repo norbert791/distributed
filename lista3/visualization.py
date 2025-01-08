@@ -98,7 +98,7 @@ class SystemVisualizer:
         im = self.ax_channels.imshow(matrix, cmap='YlOrRd')
         
         # Add colorbar
-        plt.colorbar(im, ax=self.ax_channels, label='Messages in Channel')
+        # plt.colorbar(im, ax=self.ax_channels, label='Messages in Channel')
         
         # Add labels
         self.ax_channels.set_xticks(range(num_processes))
@@ -124,7 +124,7 @@ class SystemVisualizer:
                                       edgecolor='green', linestyle='--', linewidth=2)
                     self.ax_channels.add_patch(rect)
     
-    def _draw_snapshot_status(self, step: int):
+    def _draw_snapshot_status(self):
         """Draw snapshot progress and recorded states."""
         self.ax_snapshot.clear()
         self.ax_snapshot.set_title("Snapshot Status", pad=20, fontsize=12)
@@ -183,7 +183,7 @@ class SystemVisualizer:
             
         self._draw_network(step)
         self._draw_channel_states()
-        self._draw_snapshot_status(step)
+        self._draw_snapshot_status()
         
         plt.tight_layout()
     
@@ -200,11 +200,17 @@ class Simulation:
     def __init__(self, num_processes=5):
         self.processes = {i: Process(i) for i in range(1, num_processes + 1)}
         
-        # Create connections
-        for pid1, p1 in self.processes.items():
-            for pid2, p2 in self.processes.items():
-                if pid1 != pid2:  # Full mesh network
-                    p1.connect_to(p2)
+        # Create cycle connections (C_n graph)
+        num_processes = len(self.processes)
+        for i in range(1, num_processes + 1):
+            next_pid = i % num_processes + 1
+            self.processes[i].connect_to(self.processes[next_pid])
+        
+        # Add additional random edges
+        additional_edges = np.random.randint(1, num_processes)
+        for _ in range(additional_edges):
+            pid1, pid2 = np.random.choice(range(1, num_processes + 1), 2, replace=False)
+            self.processes[pid1].connect_to(self.processes[pid2])
         
         self.snapshot_manager = SnapshotManager(self.processes)
         self.visualizer = SystemVisualizer(self.processes)
@@ -219,28 +225,29 @@ class Simulation:
         os.makedirs(run_dir, exist_ok=True)
         print(f"Saving simulation data to: {run_dir}")
         
-        for step in range(num_steps):
-            print(f"\nStep {step + 1}/{num_steps}")
+        for step in range(num_steps * 2):
+            print(f"\nStep {step//2 + 1}/{num_steps} " + "send" if step % 2 == 0 else "receive")
             
             # Update states
             for p in self.processes.values():
                 p.update_state(np.random.randint(1, 10))
             
-            # Send messages
-            for pid1 in self.processes:
-                for pid2 in self.processes:
-                    if pid1 != pid2 and np.random.random() < 0.3:
-                        self.processes[pid1].send_message(
-                            pid2, 
-                            f"Msg_{step}_{pid1}->{pid2}"
+            if step % 2 == 0:
+                # Send messages
+                for pid1 in self.processes:
+                    for pid2 in self.processes:
+                        if pid1 != pid2 and np.random.random() < 0.3:
+                            self.processes[pid1].send_message(
+                                pid2, 
+                                f"Msg_{step}_{pid1}->{pid2}"
                         )
-            
-            # Process messages
-            for p in self.processes.values():
-                for from_pid in p.incoming_channels:
-                    message = p.receive_message(from_pid)
-                    if message and not message.is_marker:
-                        print(f"Process {p.pid} received: {message.content}")
+            else:
+                # Process messages
+                for p in self.processes.values():
+                    for from_pid in p.incoming_channels:
+                        message = p.receive_message(from_pid)
+                        if message and not message.is_marker:
+                            print(f"Process {p.pid} received: {message.content}")
             
             # Start snapshot if it's time
             snapshot_started = step == snapshot_at_step

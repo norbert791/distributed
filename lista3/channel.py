@@ -8,9 +8,7 @@ class Message:
     is_marker: bool = False
 
 class Channel:
-    def __init__(self, from_pid: int, to_pid: int):
-        self.from_pid = from_pid
-        self.to_pid = to_pid
+    def __init__(self):
         self.queue = deque()
         self.recording = False
         self.recorded_messages: List[Message] = []

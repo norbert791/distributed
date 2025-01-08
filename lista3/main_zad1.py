@@ -37,7 +37,7 @@ def simulate_system():
     while not snapshot_manager.is_snapshot_complete():
         for p in processes.values():
             for from_pid in p.incoming_channels:
-                _ = p.receive_message(from_pid)
+                message = p.receive_message(from_pid)
                 if message and not message.is_marker:
                     print(f"Process {p.pid} received: {message.content}")
         time.sleep(0.1)

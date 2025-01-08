@@ -4,7 +4,7 @@ from channel import Channel, Message
 class Process:
     def __init__(self, pid: int):
         self.pid = pid
-        self.state = 0  # Local state (could be more complex)
+        self.state = 0  # Local state
         self.incoming_channels: Dict[int, Channel] = {}  # from_pid -> Channel
         self.outgoing_channels: Dict[int, Channel] = {}  # to_pid -> Channel
         self.snapshot_state = None
@@ -15,12 +15,12 @@ class Process:
     def connect_to(self, other_process: 'Process'):
         """Establish a bidirectional connection with another process."""
         # Create outgoing channel
-        outgoing = Channel(self.pid, other_process.pid)
+        outgoing = Channel()
         self.outgoing_channels[other_process.pid] = outgoing
         other_process.incoming_channels[self.pid] = outgoing
         
         # Create incoming channel
-        incoming = Channel(other_process.pid, self.pid)
+        incoming = Channel()
         self.incoming_channels[other_process.pid] = incoming
         other_process.outgoing_channels[self.pid] = incoming
     
@@ -74,6 +74,12 @@ class Process:
         """Check if the snapshot is complete for this process."""
         return self.snapshot_in_progress and len(self.marker_received_from) == len(self.incoming_channels) + 1
     
+    def clear_snapshot_data(self):
+        self.recorded_channels = set()
+        self.marker_received_from = set()
+        self.snapshot_in_progress = False
+        self.snapshot_state = None
+
     def get_snapshot_data(self):
         """Get the snapshot data for this process."""
         if not self.snapshot_in_progress:
