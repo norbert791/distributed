@@ -17,33 +17,27 @@ def simulate_system():
     snapshot_manager = SnapshotManager(processes)
     
     # Simulate some message passing and state changes
-    for _ in range(5):
+    for epoch in range(5):
+        if epoch == 2:
+            # Initiate snapshot from process 1
+            print("\nInitiating snapshot from process 1...")
+            snapshot_manager.initiate_snapshot(1)
         # Random state updates
         for p in processes.values():
             p.update_state(random.randint(1, 10))
-        
+
         # Random message passing
         for pid1 in processes:
             for pid2 in processes:
                 if pid1 != pid2 and random.random() < 0.3:  # 30% chance to send message
+                    print(f"Process {pid1} sends to {pid2}")
                     processes[pid1].send_message(pid2, f"Message from {pid1} to {pid2}")
-        
-        # Process messages
-        for p in processes.values():
-            for from_pid in p.incoming_channels:
-                message = p.receive_message(from_pid)
-                if message and not message.is_marker:
-                    print(f"Process {p.pid} received: {message.content}")
-    
-    # Initiate snapshot from process 1
-    print("\nInitiating snapshot from process 1...")
-    snapshot_manager.initiate_snapshot(1)
     
     # Continue simulation while snapshot is in progress
     while not snapshot_manager.is_snapshot_complete():
         for p in processes.values():
             for from_pid in p.incoming_channels:
-                message = p.receive_message(from_pid)
+                _ = p.receive_message(from_pid)
                 if message and not message.is_marker:
                     print(f"Process {p.pid} received: {message.content}")
         time.sleep(0.1)
@@ -60,3 +54,5 @@ def simulate_system():
 
 if __name__ == "__main__":
     simulate_system()
+    # Expected output: Process 1 has all the addressed messages
+    # Process 2&3 have only some of the messages

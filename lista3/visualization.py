@@ -191,15 +191,29 @@ class SystemVisualizer:
         plt.savefig(filename, dpi=300, bbox_inches='tight')
         print(f"Saved visualization to {filename}")
 
-class EnhancedSimulation:
+class Simulation:
     def __init__(self, num_processes=5):
         # Create processes
         self.processes = {i: Process(i) for i in range(1, num_processes + 1)}
         
         # Create connections (fully connected network)
+        connected = set()
+
+        # Create Cn graph
+        for i in range(1, num_processes):
+            p1 = self.processes[i]
+            p2 = self.processes[i+1]
+            p1.connect_to(p2)
+            connected.add((i, i+1))
+        connected.add((num_processes, 0))
+        self.processes[num_processes].connect_to(self.processes[1])
+
+        # Add random edges
         for pid1, p1 in self.processes.items():
             for pid2, p2 in self.processes.items():
-                if pid1 < pid2:  # Avoid duplicate connections
+                if (pid1, pid2) in connected:
+                    continue
+                if np.random.random() < .3:
                     p1.connect_to(p2)
         
         self.snapshot_manager = SnapshotManager(self.processes)
