@@ -1,0 +1,39 @@
+syntax = "proto3";
+package database;
+
+message RegisterReq {}
+message RegisterResp {}
+
+message UnregisterReq{}
+message UnregisterResp{}
+
+message PrimaryReq{}
+message PrimaryResp{}
+
+service Master{
+    rpc register(RegisterReq) returns (RegisterReq)
+    rpc unregister(UnregisterReq) returns (UnregisterResp)
+    rpc getPrimary(PrimaryReq) returns (PrimaryResp)
+}
+
+message PromoteReq {}
+message PromoteResp{}
+
+message GetReq{}
+message GetResp{}
+
+message SetReq{}
+message SetResp{}
+
+message BackupReq{}
+message BackupResp{}
+
+message HeartbeatReq{}
+message HeartbeatResp{}
+
+service Node{
+    rpc promote(PromoteReq) returns (PromoteResp)
+    rpc get(GetReq) returns (GetResp)
+    rpc set(SetReq) returns (SetResp)
+    rpc backup(BackupReq)
+}
