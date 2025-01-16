@@ -1,0 +1,66 @@
+syntax = "proto3";
+package database;
+
+import "google/protobuf/timestamp.proto";
+
+message RegisterReq {
+    bytes id = 1;
+}
+message RegisterResp {}
+
+message UnregisterReq{
+    bytes id = 1;
+}
+message UnregisterResp{}
+
+message PrimaryReq{}
+message PrimaryResp{
+    bytes ip = 1;
+}
+
+service Master{
+    rpc register(RegisterReq) returns (RegisterReq);
+    rpc unregister(UnregisterReq) returns (UnregisterResp);
+    rpc getPrimary(PrimaryReq) returns (PrimaryResp);
+    rpc getBackup(BackupReq) returns (BackupResp);
+}
+
+message PromoteReq {
+    PromotionType type = 1;
+
+    enum PromotionType {
+        PROMOTION_TYPE_UNSPECIFIED = 0;
+        PROMOTION_TYPE_PRIMARY = 1;
+        PROMOTION_TYPE_BACKUP = 2;
+    }
+}
+message PromoteResp{}
+
+message GetReq{
+    bytes key = 1;
+}
+message GetResp{
+    bytes value = 1;
+}
+
+message SetReq{
+    bytes key = 1;
+    bytes value = 2;
+    google.protobuf.Timestamp ts = 3;
+}
+message SetResp{}
+
+message BackupReq{
+    SetReq set = 1;
+}
+message BackupResp{}
+
+message HeartbeatReq{}
+message HeartbeatResp{}
+
+service Node{
+    rpc promote(PromoteReq) returns (PromoteResp);
+    rpc get(GetReq) returns (GetResp);
+    rpc set(SetReq) returns (SetResp);
+    rpc backup(stream BackupReq) returns (stream BackupResp);
+}
