@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+message DistributedUUID {
+    uint32 unix_ts = 1;    // 32 bits for unix timestamp
+    uint32 counter = 2;    // 12 bits for counter (stored in a 32-bit field)
+    uint32 threadID = 3;   // 12 bits for thread ID (stored in a 32-bit field)
+    uint32 clusterID = 4;  // 16 bits for cluster ID (stored in a 32-bit field)
+    uint32 podID = 5;      // 16 bits for pod ID (stored in a 32-bit field)
+    uint32 reserved = 6;   // 8 bits reserved (stored in a 32-bit field)
+}
+
+message UUIDRequest {
+    int32 count = 1; // Number of UUIDs to generate
+}
+
+message UUIDResponse {
+    repeated DistributedUUID uuids = 1; // List of generated UUIDs
+}
+
+service UUIDService {
+    rpc GenerateUUIDs (UUIDRequest) returns (UUIDResponse);
+}
