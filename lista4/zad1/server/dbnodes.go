@@ -24,6 +24,7 @@ type Node struct {
 	fsm           raft.FSM
 	config        *raft.Config
 	raftNode      *raft.Raft
+	addr          raft.ServerAddress
 }
 
 func (n *Node) Close() error {
@@ -39,26 +40,26 @@ type NodePool struct {
 
 func NewNodePool(numOfNodes int) (*NodePool, error) {
 	nodes := make([]*Node, numOfNodes)
-	for i := range numOfNodes {
+	for i := range nodes {
 		config := raft.DefaultConfig()
-		config.LocalID = raft.ServerID("node" + string(i))
 		config.HeartbeatTimeout = 1000 * time.Millisecond
 		config.ElectionTimeout = 1000 * time.Millisecond
 		config.CommitTimeout = 500 * time.Millisecond
 
 		// Create an in-memory transport
-		_, transport := raft.NewInmemTransport("")
+		addr, transport := raft.NewInmemTransport("")
 		if transport == nil {
 			return nil, errors.New("failed to create transport")
 		}
+		config.LocalID = raft.ServerID(addr)
 
 		// Create a snapshot store
-		snapshotStore, err := raft.NewFileSnapshotStore(filepath.Join(os.TempDir(), "raft-snapshots"), 1, os.Stderr)
+		snapshotStore, err := raft.NewFileSnapshotStore(filepath.Join(os.TempDir(), fmt.Sprintf("snapshot-%d", (time.Now().Unix()))), 1, os.Stderr)
 		if err != nil {
 			log.Fatalf("failed to create snapshot store: %v", err)
 		}
 
-		boltdb, err := bolt.Open(filepath.Join(os.TempDir(), fmt.Sprintf("raft-log-%d.bolt", i)), 0600, nil)
+		boltdb, err := bolt.Open(filepath.Join(os.TempDir(), fmt.Sprintf("raft-log-%d-%d.bolt", i, time.Now().Unix())), 0600, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -82,19 +83,20 @@ func NewNodePool(numOfNodes int) (*NodePool, error) {
 			stableStore:   stableStore,
 			fsm:           fsm,
 			config:        config,
+			addr:          addr,
 		}
 	}
 
+	// Connect the transports of all nodes to each other
 	for i, node := range nodes {
 		for j, otherNode := range nodes {
-			if i == j {
-				continue
+			if i != j {
+				node.transport.Connect(otherNode.addr, otherNode.transport)
 			}
-			node.transport.Connect(otherNode.transport.LocalAddr(), otherNode.transport)
-			otherNode.transport.Connect(node.transport.LocalAddr(), node.transport)
 		}
 	}
 
+	// Initialize the Raft nodes
 	for _, node := range nodes {
 		raftNode, err := raft.NewRaft(node.config, node.fsm, node.logStore, node.stableStore, node.snapshotStore, node.transport)
 		if err != nil {
@@ -111,20 +113,17 @@ func (np *NodePool) BootstrapCluster() error {
 		return errors.New("no nodes in the pool")
 	}
 
-	root := np.nodes[0]
-	err := root.raftNode.BootstrapCluster(
-		raft.Configuration{Servers: []raft.Server{{ID: root.config.LocalID, Address: root.transport.LocalAddr()}}}).Error()
-	if err != nil {
-		return err
+	config := raft.Configuration{
+		Servers: make([]raft.Server, len(np.nodes)),
 	}
-	for _, node := range np.nodes[1:] {
-		err := root.raftNode.AddVoter(node.config.LocalID, node.transport.LocalAddr(), 0, 10*time.Second).Error()
-		if err != nil {
-			return err
+	for i, node := range np.nodes {
+		config.Servers[i] = raft.Server{
+			ID:      node.config.LocalID,
+			Address: node.addr,
 		}
 	}
 
-	return nil
+	return np.nodes[0].raftNode.BootstrapCluster(config).Error()
 }
 
 func (np *NodePool) Close() error {

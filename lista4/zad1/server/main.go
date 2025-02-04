@@ -26,6 +26,9 @@ func main() {
 		log.Fatalf("failed to create node pool: %v", err)
 	}
 	defer pool.Close()
+	if err := pool.BootstrapCluster(); err != nil {
+		log.Fatalf("failed to bootstrap cluster: %v", err)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/db", func(w http.ResponseWriter, r *http.Request) {

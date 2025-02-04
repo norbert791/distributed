@@ -48,5 +48,10 @@ func main() {
 		log.Fatalf("unexpected status code: %d, body: %v", resp.StatusCode, string(bts))
 	} else {
 		log.Println("Request successful")
+		bts, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatalf("failed to read response body: %v", err)
+		}
+		log.Println(string(bts))
 	}
 }
